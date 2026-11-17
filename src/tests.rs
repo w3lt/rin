@@ -214,7 +214,7 @@ async fn queued_messages_time_out_without_starting() {
     tokio::time::sleep(Duration::from_millis(30)).await;
     let started = Instant::now();
     let second = t.user().send("a", "never runs", 1).await.unwrap_err().to_string();
-    assert!(second.starts_with("timeout"), "{second}");
+    assert!(second.starts_with("timeout: a was busy") && second.ends_with("not started"), "{second}");
     assert!(started.elapsed() < Duration::from_millis(1500), "{:?} after its own send", started.elapsed());
     assert!(first.await.unwrap().unwrap_err().to_string().starts_with("timeout"));
     assert_eq!(t.starts(), ["start sleep 30"]);

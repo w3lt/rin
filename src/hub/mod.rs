@@ -60,7 +60,8 @@ pub enum HubError {
     UnknownAgent(String),
     ToSelf,
     HopLimit { hops: u32, max: u32 },
-    Timeout { to: String, after: Duration },
+    /// Why the message ran out of time; starts with `timeout:`.
+    Timeout(String),
     ReceiverDown { to: String },
     /// An error reported by the receiver's runtime (`session failed: …`).
     Session(String),
@@ -76,9 +77,7 @@ impl std::fmt::Display for HubError {
             HubError::HopLimit { hops, max } => {
                 write!(f, "hop limit reached: this message would be hop {hops}, maxHops is {max}")
             }
-            HubError::Timeout { to, after } => {
-                write!(f, "timeout: no reply from {to} within {}", crate::config::format_duration(*after))
-            }
+            HubError::Timeout(why) => write!(f, "{why}"),
             HubError::ReceiverDown { to } => write!(f, "receiver down: cannot reach {to}"),
             HubError::Session(text) => write!(f, "{text}"),
         }
@@ -92,7 +91,7 @@ impl IntoResponse for HubError {
             HubError::BadRequest(_) | HubError::ToSelf => StatusCode::BAD_REQUEST,
             HubError::UnknownAgent(_) => StatusCode::NOT_FOUND,
             HubError::HopLimit { .. } => StatusCode::CONFLICT,
-            HubError::Timeout { .. } => StatusCode::GATEWAY_TIMEOUT,
+            HubError::Timeout(_) => StatusCode::GATEWAY_TIMEOUT,
             HubError::ReceiverDown { .. } | HubError::Session(_) => StatusCode::BAD_GATEWAY,
         };
         (status, axum::Json(json!({ "error": self.to_string() }))).into_response()
@@ -170,18 +169,31 @@ impl Hub {
         let admit = self.sched().admit(id, from, to, std::time::Instant::now());
         if let Admit::Queued(handover) = admit {
             self.check_deadlocks();
-            let handed_over = matches!(tokio::time::timeout_at(deadline, handover).await, Ok(Ok(())));
+            // Either way the message never starts; `_slot` passes the slot on.
+            if !matches!(tokio::time::timeout_at(deadline, handover).await, Ok(Ok(()))) {
+                return Err(HubError::Timeout(format!(
+                    "timeout: {to} was busy for the whole {}; the message never started",
+                    self.timeout_text()
+                )));
+            }
             let left = deadline.saturating_duration_since(Instant::now());
-            if !handed_over || left < (self.timeout / MIN_START_SHARE).min(MIN_START_MAX) {
-                // Dropped without ever starting (`_slot` passes the slot on).
-                return Err(self.timed_out(to));
+            if left < (self.timeout / MIN_START_SHARE).min(MIN_START_MAX) {
+                return Err(HubError::Timeout(format!(
+                    "timeout: {to} was busy until {} before the {} timeout; the message was not started",
+                    crate::config::format_duration(left),
+                    self.timeout_text()
+                )));
             }
         }
         self.run(from, request, deadline).await
     }
 
+    fn timeout_text(&self) -> String {
+        crate::config::format_duration(self.timeout)
+    }
+
     fn timed_out(&self, to: &str) -> HubError {
-        HubError::Timeout { to: to.to_string(), after: self.timeout }
+        HubError::Timeout(format!("timeout: no reply from {to} within {}", self.timeout_text()))
     }
 
     /// Asks the receiver's runtime to run the message as a fresh session.
@@ -200,7 +212,8 @@ impl Hub {
             from_label,
             text: request.text.clone(),
             hops: request.hops,
-            timeout_ms: remaining.as_millis() as u64,
+            // Never 0: the runtime caps the session at this.
+            timeout_ms: (remaining.as_millis() as u64).max(1),
         };
         let token = self.agent_tokens.get(to).cloned().unwrap_or_default();
         let response = self
