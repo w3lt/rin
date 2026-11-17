@@ -144,10 +144,14 @@ impl Messaging {
     }
 }
 
-/// Parses `30m` style durations (whole minutes, as the schema allows).
+/// The longest `timeout` Rin takes: a year, far beyond any task, and far from
+/// overflowing a deadline.
+pub const MAX_MINUTES: u64 = 365 * 24 * 60;
+
+/// Parses `30m` style durations (whole minutes, as the schema allows), up to [`MAX_MINUTES`].
 pub fn parse_minutes(s: &str) -> Option<Duration> {
     let minutes: u64 = s.strip_suffix('m')?.parse().ok()?;
-    (minutes > 0).then(|| Duration::from_secs(minutes * 60))
+    (1..=MAX_MINUTES).contains(&minutes).then(|| Duration::from_secs(minutes * 60))
 }
 
 /// `45s`, `3m`, `1h20m`.
@@ -171,6 +175,9 @@ impl Config {
 
     /// Checks JSON Schema can't express.
     fn check(&self) -> anyhow::Result<()> {
+        if parse_minutes(&self.messaging.timeout).is_none() {
+            anyhow::bail!("messaging.timeout: {} is longer than {MAX_MINUTES}m (a year)", self.messaging.timeout);
+        }
         let mut seen = std::collections::HashSet::new();
         for agent in &self.agents {
             if !seen.insert(agent.id.as_str()) {
@@ -324,6 +331,15 @@ mod tests {
         assert_eq!(parse_minutes("1m"), Some(Duration::from_secs(60)));
         assert_eq!(parse_minutes("0m"), None);
         assert_eq!(parse_minutes("30s"), None);
+        assert_eq!(parse_minutes("525600m"), Some(Duration::from_secs(525_600 * 60)));
+        assert_eq!(parse_minutes("525601m"), None);
+        assert_eq!(parse_minutes("300000000000000000000m"), None);
+    }
+
+    #[test]
+    fn rejects_absurd_timeouts() {
+        let e = err(&edit("timeout: 30m", "timeout: 300000000000000000m"));
+        assert!(e.contains("messaging.timeout: 300000000000000000m is longer than 525600m"), "{e}");
     }
 
     #[test]
