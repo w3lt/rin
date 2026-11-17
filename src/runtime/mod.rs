@@ -98,6 +98,14 @@ impl Runtime {
         for dir in [&scratch, &work] {
             std::fs::create_dir_all(dir).map_err(|e| SessionError::Failed(format!("cannot create {}: {e}", dir.display())))?;
         }
+        // Harnesses take the prompt as one argument; Linux refuses longer ones.
+        if prompt.len() > MAX_ARG_LEN {
+            return Err(SessionError::Failed(format!(
+                "message too long for the harness's command line: {} KiB, at most {} KiB",
+                prompt.len().div_ceil(1024),
+                MAX_ARG_LEN / 1024
+            )));
+        }
         let files = SessionFiles::new(&scratch, &marker);
         let invocation = harness::invocation(self.harness, &self.model, prompt, &files.answer);
         let program = self.program.clone().unwrap_or_else(|| PathBuf::from(invocation.program));
@@ -164,6 +172,10 @@ impl Drop for SessionFiles {
         }
     }
 }
+
+/// Linux's limit on one command-line argument (`MAX_ARG_STRLEN`, less the final NUL),
+/// checked on every platform so tests on macOS hold to it too.
+const MAX_ARG_LEN: usize = 128 * 1024 - 1;
 
 fn last_lines(text: &str, n: usize) -> String {
     let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
@@ -292,6 +304,18 @@ mod tests {
             prompt("rin", "Chief Architect", "Reply with exactly: pong"),
             "[Rin] Message from rin (Chief Architect).\nYour final answer will be sent back to them as the reply.\n\nReply with exactly: pong"
         );
+    }
+
+    #[tokio::test]
+    async fn refuses_prompts_longer_than_one_argument() {
+        let home = std::env::temp_dir().join(format!("rin-runtime-argmax-{}", std::process::id()));
+        let runtime = Runtime::new(Harness::ClaudeCode, "m", Duration::from_secs(5), "tok", "http://hub:7000", &home);
+        let result = runtime.run_session(&"x".repeat(MAX_ARG_LEN + 1), 1, Duration::from_secs(5)).await;
+        let _ = std::fs::remove_dir_all(&home);
+        match result {
+            Err(SessionError::Failed(why)) => assert!(why.starts_with("message too long for the harness's command line"), "{why}"),
+            _ => panic!("a prompt over {MAX_ARG_LEN} bytes was run"),
+        }
     }
 
     #[test]
