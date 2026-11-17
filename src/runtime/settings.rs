@@ -27,7 +27,9 @@ pub fn tool_timeout(timeout: Duration) -> Duration {
 }
 
 /// Variables `rin mcp` needs, for harnesses that don't pass their environment on.
-const MCP_ENV: [&str; 3] = ["RIN_TOKEN", "RIN_HUB_URL", "RIN_HOPS"];
+/// What Codex must pass to `rin mcp` (it strips the rest); `RIN_SESSION` lets
+/// the runtime kill the server with its session.
+const MCP_ENV: [&str; 4] = ["RIN_TOKEN", "RIN_HUB_URL", "RIN_HOPS", "RIN_SESSION"];
 
 pub fn apply(home: &Path, settings: &Settings) -> Result<Vec<PathBuf>> {
     let tool_timeout = tool_timeout(settings.timeout);
@@ -267,7 +269,7 @@ mod tests {
         let rin = &config["mcp_servers"]["rin"];
         assert_eq!(rin["command"].as_str(), Some("rin"));
         assert_eq!(rin["tool_timeout_sec"].as_integer(), Some(1860));
-        assert_eq!(rin["env_vars"].as_array().unwrap().len(), 3);
+        assert_eq!(rin["env_vars"].as_array().unwrap().len(), 4);
         assert_eq!(config["model_provider"].as_str(), Some("bifrost"));
         assert_eq!(config["model_providers"]["bifrost"]["base_url"].as_str(), Some("http://bifrost:8080/openai/v1"));
 
