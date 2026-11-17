@@ -1,7 +1,7 @@
 //! Small file helpers for `rin generate`.
 
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -19,10 +19,23 @@ pub fn write_if_changed(path: &Path, bytes: &[u8]) -> Result<()> {
     fs::write(path, bytes).with_context(|| format!("cannot write {}", path.display()))
 }
 
-/// Like [`write_if_changed`], for secrets: readable by you only.
+/// Like [`write_if_changed`], for secrets: readable by you only, from the
+/// moment the file exists.
 pub fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
-    write_if_changed(path, bytes)?;
-    set_mode(path, 0o600)
+    if path.exists() {
+        set_mode(path, 0o600)?;
+    } else {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).with_context(|| format!("cannot create {}", parent.display()))?;
+        }
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(path)
+            .with_context(|| format!("cannot create {}", path.display()))?;
+    }
+    write_if_changed(path, bytes)
 }
 
 pub fn set_mode(path: &Path, mode: u32) -> Result<()> {
