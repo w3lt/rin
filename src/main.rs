@@ -11,5 +11,10 @@ mod generate;
 mod team;
 #[cfg(feature = "host")]
 mod yaml;
+mod proto;
+#[cfg(feature = "hub")]
+mod hub;
+#[cfg(any(feature = "hub", feature = "agent"))]
+mod signals;
 
 fn main() {}
