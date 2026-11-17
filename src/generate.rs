@@ -39,6 +39,8 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
     }
     let sources = check_instructions(&config, instructions)?;
 
+    check_names(home, &config)?;
+
     let team = Team::at(home, &config.name);
     fs::create_dir_all(&team.dir).with_context(|| format!("cannot create {}", team.dir.display()))?;
     crate::files::set_mode(home, 0o700)?;
@@ -135,6 +137,29 @@ fn remove_others(dir: &Path, keep: impl IntoIterator<Item = String>) -> Result<(
             let path = entry.path();
             let result = if path.is_dir() { fs::remove_dir_all(&path) } else { fs::remove_file(&path) };
             result.with_context(|| format!("cannot remove {}", path.display()))?;
+        }
+    }
+    Ok(())
+}
+
+/// Refuses a team whose Docker names another team in `home` already uses
+/// (team `a` agent `b-c` and team `a-b` agent `c` are both `rin-a-b-c`).
+fn check_names(home: &Path, config: &Config) -> Result<()> {
+    let ours = compose::docker_names(config);
+    let Ok(entries) = fs::read_dir(home.join("teams")) else { return Ok(()) };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name == config.name {
+            continue;
+        }
+        // A team folder Rin can't read (another version, half deleted) has no say.
+        let Ok(other) = Team::at(home, &name).config() else { continue };
+        let theirs = compose::docker_names(&other);
+        if let Some((kind, clash)) = ours.iter().find(|n| theirs.contains(n)) {
+            bail!(
+                "team {:?} would use the Docker {kind} name {clash:?}, which team {name:?} already uses: rename the team or an agent",
+                config.name
+            );
         }
     }
     Ok(())
@@ -399,6 +424,20 @@ mod tests {
         fs::remove_file(f.team().join("tokens.json")).unwrap();
         f.generate().unwrap();
         assert_ne!(second, label(&f));
+    }
+
+    #[test]
+    fn refuses_names_another_team_uses() {
+        let f = Fixture::new("names");
+        f.generate().unwrap();
+        // Team "my" with agent "team-backend" would be container rin-my-team-backend.
+        f.edit("name: my-team", "name: my");
+        f.edit("id: backend", "id: team-backend");
+        let agents = f.root.join("project/agents");
+        fs::rename(agents.join("backend"), agents.join("team-backend")).unwrap();
+        let error = f.generate().unwrap_err().to_string();
+        assert!(error.contains(r#"name "rin-my-team-backend", which team "my-team" already uses"#), "{error}");
+        assert!(!f.home().join("teams/my").exists());
     }
 
     #[test]

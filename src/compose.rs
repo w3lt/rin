@@ -56,6 +56,23 @@ fn volume_name(config: &Config, what: &str) -> String {
     format!("rin-{}-{what}", config.name)
 }
 
+/// The Docker names a team's services and volumes get. Containers, images and
+/// volumes share a machine-wide namespace each, so two teams must not collide.
+pub fn docker_names(config: &Config) -> Vec<(&'static str, String)> {
+    let mut services = vec!["hub".to_string()];
+    services.extend(config.agents.iter().map(|a| a.id.clone()));
+    if config.uses_api_keys() {
+        services.push("bifrost".to_string());
+    }
+    let mut names: Vec<_> = services.iter().map(|svc| ("container", volume_name(config, svc))).collect();
+    names.push(("volume", volume_name(config, "hub")));
+    names.extend(config.agents.iter().map(|a| ("volume", volume_name(config, &format!("{}-home", a.id)))));
+    if config.uses_api_keys() {
+        names.push(("volume", volume_name(config, "bifrost")));
+    }
+    names
+}
+
 pub fn render(inputs: &Inputs) -> String {
     let config = inputs.config;
     let version = &config.version;
