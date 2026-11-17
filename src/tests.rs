@@ -49,7 +49,8 @@ async fn serve(router: axum::Router) -> SocketAddr {
     addr
 }
 
-/// Agents `a` (maxSessions 1) and `b` (3); `down` has no runtime.
+/// Agents `a` (maxSessions 1) and `b` (3); `down` has no runtime; `stale`'s
+/// runtime holds an old token.
 async fn team(name: &str, timeout: Duration) -> Team {
     let dir = std::env::temp_dir().join(format!("rin-e2e-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -66,19 +67,20 @@ async fn team(name: &str, timeout: Duration) -> Team {
     let config = crate::config::from_value(json!({
         "rin": "tohsaka", "name": "e2e", "version": crate::config::VERSION,
         "messaging": { "timeout": "1m", "maxHops": 3 },
-        "agents": [agent("a", 1), agent("b", 3), agent("down", 1)],
+        "agents": [agent("a", 1), agent("b", 3), agent("down", 1), agent("stale", 1)],
     }))
     .unwrap();
 
     let mut tokens = HashMap::new();
     let mut run_urls = HashMap::new();
-    for id in ["user", "a", "b", "down"] {
+    for id in ["user", "a", "b", "down", "stale"] {
         tokens.insert(id.to_string(), format!("token-{id}-{name}"));
     }
-    for id in ["a", "b"] {
+    for id in ["a", "b", "stale"] {
         let home = dir.join(id);
         std::fs::create_dir_all(&home).unwrap();
-        let mut runtime = Runtime::new(Harness::ClaudeCode, "fake-model", Duration::from_secs(60), &tokens[id], "http://127.0.0.1:7000", &home);
+        let token = if id == "stale" { "token-from-before" } else { &tokens[id] };
+        let mut runtime = Runtime::new(Harness::ClaudeCode, "fake-model", Duration::from_secs(60), token, "http://127.0.0.1:7000", &home);
         runtime.program = Some(fake.clone());
         let addr = serve(crate::runtime::router(Arc::new(runtime))).await;
         run_urls.insert(id.to_string(), format!("http://{addr}/run"));
@@ -88,7 +90,7 @@ async fn team(name: &str, timeout: Duration) -> Team {
     run_urls.insert("down".to_string(), format!("http://{closed}/run"));
 
     // Agents' "container IPs" are not 127.0.0.1, so test requests over HTTP come from "your machine".
-    let ips = [("a", "10.9.0.2"), ("b", "10.9.0.3"), ("down", "10.9.0.4")]
+    let ips = [("a", "10.9.0.2"), ("b", "10.9.0.3"), ("down", "10.9.0.4"), ("stale", "10.9.0.5")]
         .into_iter()
         .map(|(id, ip)| (id.to_string(), ip.parse().unwrap()))
         .collect();
@@ -167,6 +169,8 @@ async fn rejects_self_unknown_and_unreachable_receivers() {
     assert!(t.send_as("b", "nobody", "hi", 1).await.unwrap_err().to_string().starts_with("unknown agent"));
     let err = t.user().send("down", "hi", 1).await.unwrap_err();
     assert!(err.to_string().starts_with("receiver down"), "{err}");
+    let err = t.user().send("stale", "hi", 1).await.unwrap_err();
+    assert!(err.to_string().starts_with("session failed: stale refused the hub"), "{err}");
     assert_eq!(t.hub.agents(&Principal::User).agents[2].sessions, 0, "the failed message gave its slot back");
 }
 

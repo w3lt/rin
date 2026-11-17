@@ -238,6 +238,10 @@ impl Hub {
         match (status, body) {
             (StatusCode::OK, RunResponse { reply: Some(reply), .. }) => Ok(reply),
             (StatusCode::GATEWAY_TIMEOUT, _) => Err(self.timed_out(to)),
+            // Not your token: the runtime has an older tokens.json than the hub.
+            (StatusCode::UNAUTHORIZED, _) => Err(HubError::Session(format!(
+                "session failed: {to} refused the hub (its token doesn't match tokens.json); `rin up` restarts it with the current one"
+            ))),
             (_, RunResponse { error: Some(error), .. }) => Err(HubError::Session(error)),
             (status, _) => Err(HubError::Session(format!("session failed: {to} answered {status}"))),
         }
