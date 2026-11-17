@@ -24,6 +24,7 @@
   "$defs": {
     "agent": {
       "type": "object",
+      "additionalProperties": false,
       "required": [
         "id",
         "type",
@@ -71,6 +72,7 @@
     },
     "resources": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "cpu": {
           "type": "string",
