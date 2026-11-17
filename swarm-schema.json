@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rin Swarm Agent Configuration",
+  "description": "Declarative configuration for a cluster of Rin swarm agent. Rin Tohsaka is the best waifu btw",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rin"
+  ],
+  "properties": {
+    "rin": {
+      "type": "string",
+      "const": "tohsaka"
+    },
+    "swarm": {
+      "type": "array"
+    }
+  },
+  "$defs": {
+    "agent": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "leader",
+            "member"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "description": "Like AI Engineer or Universe Engineer or some cool fancy title you can imagine"
+        },
+        "resources": {
+          "$ref": "#/$defs/resources"
+        },
+        "harness": {
+          "enum": [
+            "claude-code",
+            "codex",
+            "antigravity",
+            "pi"
+          ]
+        },
+        "authentication": {
+          "enum": [
+            "subscription",
+            "apiKey"
+          ]
+        },
+        "apiKey": {
+          "type": "string",
+          "description": "Provide this only if authentication is apiKey"
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "cpu": {
+          "type": "string",
+          "description": "The CPU amount that will be allocated for this machine"
+        },
+        "gpu": {
+          "type": "string",
+          "description": "Only if you have GPU"
+        },
+        "ram": {
+          "type": "string",
+          "description": "The RAM amount that will be allocated for this machine"
+        },
+        "storage": {
+          "type": "string",
+          "description": "The amount of storage (RAM exclusive) that will be allocated for this machine"
+        }
+      }
+    }
+  }
+}
