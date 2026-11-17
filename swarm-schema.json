@@ -5,7 +5,8 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "rin"
+    "rin",
+    "swarm"
   ],
   "properties": {
     "rin": {
@@ -13,12 +14,24 @@
       "const": "tohsaka"
     },
     "swarm": {
-      "type": "array"
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/agent"
+      }
     }
   },
   "$defs": {
     "agent": {
       "type": "object",
+      "required": [
+        "id",
+        "type",
+        "label",
+        "resources",
+        "harness",
+        "authentication"
+      ],
       "properties": {
         "id": {
           "type": "string"
