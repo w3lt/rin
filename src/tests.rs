@@ -18,7 +18,8 @@ use crate::proto::{Kind, SendRequest};
 use crate::runtime::Runtime;
 
 /// Answers `<first prompt line> | hops=<RIN_HOPS> | <message>`; `sleep N …` sleeps N seconds
-/// (in a child process, whose pid it records), `fail` exits 3.
+/// (in a child process, whose pid it records), `fail` exits 3, `bg` leaves a
+/// `sleep 30` running and answers at once.
 const FAKE_CLAUDE: &str = r#"#!/bin/sh
 prompt="$2"
 first=$(printf '%s\n' "$prompt" | head -n 1)
@@ -27,6 +28,7 @@ echo "start $text" >> "$(dirname "$0")/starts"
 case "$text" in
   sleep*) set -- $text; sleep "$2" & echo $! > "$(dirname "$0")/sleep.pid"; wait ;;
   fail) echo "working"; echo "boom: no such model" >&2; exit 3 ;;
+  bg) sleep 30 & echo $! > "$(dirname "$0")/sleep.pid" ;;
 esac
 printf '{"type":"result","is_error":false,"result":"%s | hops=%s | %s"}\n' "$first" "$RIN_HOPS" "$text"
 "#;
@@ -108,6 +110,17 @@ impl Team {
     }
 
     /// Sessions the fake harness started, in order (all agents share it).
+    /// Waits for the process the fake harness recorded in `sleep.pid` to be gone.
+    async fn sleep_killed(&self) {
+        let pid: i32 = std::fs::read_to_string(self.dir.join("sleep.pid")).unwrap().trim().parse().unwrap();
+        let gone = async {
+            while nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), None).is_ok() {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        };
+        tokio::time::timeout(Duration::from_secs(3), gone).await.expect("the session's process was killed");
+    }
+
     fn starts(&self) -> Vec<String> {
         std::fs::read_to_string(self.dir.join("starts")).unwrap_or_default().lines().map(str::to_string).collect()
     }
@@ -174,14 +187,43 @@ async fn timeout_kills_the_session() {
     assert!(started.elapsed() < Duration::from_secs(5), "took {:?}", started.elapsed());
 
     // The session's child process is gone, and the slot is free again.
-    let pid: i32 = std::fs::read_to_string(t.dir.join("sleep.pid")).unwrap().trim().parse().unwrap();
-    let gone = async {
-        while nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), None).is_ok() {
-            tokio::time::sleep(Duration::from_millis(50)).await;
+    t.sleep_killed().await;
+    assert_eq!(t.hub.agents(&Principal::User).agents[1].sessions, 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_sender_that_stops_waiting_ends_the_session() {
+    // The chain behind nested messages: a killed sender drops its request,
+    // the hub drops the runtime's, and the runtime kills the session.
+    let t = Arc::new(team("cancel", Duration::from_secs(30)).await);
+    let send = {
+        let t = t.clone();
+        tokio::spawn(async move { t.user().send("b", "sleep 30", 1).await })
+    };
+    while !t.dir.join("sleep.pid").exists() {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert_eq!(t.hub.agents(&Principal::User).agents[1].sessions, 1);
+    send.abort();
+    t.sleep_killed().await;
+    let freed = async {
+        while t.hub.agents(&Principal::User).agents[1].sessions != 0 {
+            tokio::time::sleep(Duration::from_millis(20)).await;
         }
     };
-    tokio::time::timeout(Duration::from_secs(3), gone).await.expect("sleep was killed");
-    assert_eq!(t.hub.agents(&Principal::User).agents[1].sessions, 0);
+    tokio::time::timeout(Duration::from_secs(3), freed).await.expect("the slot was freed");
+    let log = t.user().log(None, 0).await.unwrap();
+    assert!(log.last().unwrap().text.starts_with("cancelled"), "{:?}", log.last());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn leftovers_of_a_finished_session_are_stopped() {
+    let t = team("leftovers", Duration::from_secs(10)).await;
+    let started = Instant::now();
+    let reply = t.user().send("b", "bg", 1).await.unwrap();
+    assert!(reply.ends_with("| bg"), "{reply}");
+    assert!(started.elapsed() < Duration::from_secs(5), "a background process held up the reply");
+    t.sleep_killed().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

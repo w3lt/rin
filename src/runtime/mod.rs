@@ -91,19 +91,23 @@ impl Runtime {
     }
 
     /// Runs one message as a fresh headless session and returns its final answer.
-    /// The whole session (and anything it started) is killed when `limit` runs out,
-    /// or when the hub stops waiting.
+    /// The session and everything it started are killed when it ends, when
+    /// `limit` runs out, or when the hub stops waiting.
     pub async fn run_session(&self, prompt: &str, hops: u32, limit: Duration) -> Result<String, SessionError> {
         let marker = format!("{}-{}", std::process::id(), self.sessions.fetch_add(1, Ordering::Relaxed));
         let scratch = self.home.join(".cache/rin");
-        let answer_file = scratch.join(format!("answer-{marker}.txt"));
         let work = self.home.join("work");
         for dir in [&scratch, &work] {
             std::fs::create_dir_all(dir).map_err(|e| SessionError::Failed(format!("cannot create {}: {e}", dir.display())))?;
         }
-
-        let invocation = harness::invocation(self.harness, &self.model, prompt, &answer_file);
+        let files = SessionFiles::new(&scratch, &marker);
+        let invocation = harness::invocation(self.harness, &self.model, prompt, &files.answer);
         let program = self.program.clone().unwrap_or_else(|| PathBuf::from(invocation.program));
+        // Output goes to files, not pipes: a background process the session
+        // leaves behind can't hold them open and stall the reply.
+        let create = |path: &Path| {
+            std::fs::File::create(path).map_err(|e| SessionError::Failed(format!("cannot create {}: {e}", path.display())))
+        };
         let mut command = tokio::process::Command::new(&program);
         command
             .args(&invocation.args)
@@ -111,33 +115,55 @@ impl Runtime {
             .env("RIN_HOPS", hops.to_string())
             .env("RIN_SESSION", &marker)
             .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stdout(create(&files.stdout)?)
+            .stderr(create(&files.stderr)?)
             .process_group(0)
             .kill_on_drop(true);
-        let child = command
+        let mut child = command
             .spawn()
             .map_err(|e| SessionError::Failed(format!("cannot start {}: {e}", program.display())))?;
-        let mut kill = KillOnDrop { group: child.id(), marker, armed: true };
+        let _kill = KillOnDrop { group: child.id(), marker };
 
-        let output = tokio::time::timeout(limit, child.wait_with_output()).await;
-        let answer_text = std::fs::read_to_string(&answer_file).ok();
-        let _ = std::fs::remove_file(&answer_file);
-        let output = match output {
+        let status = match tokio::time::timeout(limit, child.wait()).await {
             Err(_) => return Err(SessionError::Timeout(limit)),
             Ok(Err(e)) => return Err(SessionError::Failed(format!("lost the session: {e}"))),
-            Ok(Ok(output)) => output,
+            Ok(Ok(status)) => status,
         };
-        kill.armed = false;
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = files.read(&files.stdout);
+        let stderr = files.read(&files.stderr);
         let tail = || last_lines(&format!("{stdout}\n{stderr}"), LAST_LINES);
-        if !output.status.success() {
-            return Err(SessionError::Failed(format!("{} exited with {}:\n{}", program.display(), output.status, tail())));
+        if !status.success() {
+            return Err(SessionError::Failed(format!("{} exited with {status}:\n{}", program.display(), tail())));
         }
-        harness::answer(self.harness, &stdout, answer_text.as_deref())
+        let answer = std::fs::read_to_string(&files.answer).ok();
+        harness::answer(self.harness, &stdout, answer.as_deref())
             .map_err(|why| SessionError::Failed(format!("{why}\n{}", tail())))
+    }
+}
+
+/// A session's output and answer files in `~/.cache/rin`, removed afterwards.
+struct SessionFiles {
+    stdout: PathBuf,
+    stderr: PathBuf,
+    answer: PathBuf,
+}
+
+impl SessionFiles {
+    fn new(dir: &Path, marker: &str) -> SessionFiles {
+        let path = |what: &str| dir.join(format!("{marker}.{what}"));
+        SessionFiles { stdout: path("out"), stderr: path("err"), answer: path("answer") }
+    }
+
+    fn read(&self, path: &Path) -> String {
+        std::fs::read(path).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default()
+    }
+}
+
+impl Drop for SessionFiles {
+    fn drop(&mut self) {
+        for path in [&self.stdout, &self.stderr, &self.answer] {
+            let _ = std::fs::remove_file(path);
+        }
     }
 }
 
@@ -152,14 +178,10 @@ struct KillOnDrop {
     group: Option<u32>,
     #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     marker: String,
-    armed: bool,
 }
 
 impl Drop for KillOnDrop {
     fn drop(&mut self) {
-        if !self.armed {
-            return;
-        }
         if let Some(group) = self.group {
             let _ = killpg(Pid::from_raw(group as i32), Signal::SIGKILL);
         }
@@ -202,10 +224,7 @@ async fn post_run(
         Ok(request) => request,
         Err(e) => return error(StatusCode::BAD_REQUEST, format!("bad request: {e}")),
     };
-    let limit = match request.timeout_ms {
-        0 => runtime.timeout,
-        ms => Duration::from_millis(ms).min(runtime.timeout),
-    };
+    let limit = Duration::from_millis(request.timeout_ms).min(runtime.timeout);
     let prompt = prompt(&request.from, &request.from_label, &request.text);
     match runtime.run_session(&prompt, request.hops, limit).await {
         Ok(reply) => axum::Json(RunResponse { reply: Some(reply), error: None }).into_response(),
