@@ -46,12 +46,14 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
 
     let source = fs::canonicalize(file).unwrap_or_else(|_| file.to_path_buf());
     write_if_changed(&team.dir.join("source"), format!("{}\n", source.display()).as_bytes())?;
-    write_if_changed(&team.rin_json(), format!("{}\n", serde_json::to_string_pretty(&config)?).as_bytes())?;
+    let rin_json = format!("{}\n", serde_json::to_string_pretty(&config)?);
+    write_if_changed(&team.rin_json(), rin_json.as_bytes())?;
     write_instructions(&team, &sources)?;
     write_if_changed(&team.dir.join("images/Dockerfile"), DOCKERFILE.as_bytes())?;
 
     let tokens = tokens(&team, &config)?;
-    write_private(&team.tokens_file(), format!("{}\n", serde_json::to_string_pretty(&tokens)?).as_bytes())?;
+    let tokens_json = format!("{}\n", serde_json::to_string_pretty(&tokens)?);
+    write_private(&team.tokens_file(), tokens_json.as_bytes())?;
 
     let virtual_keys = if config.uses_api_keys() {
         let keys_env = home.join("keys.env");
@@ -71,7 +73,8 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
     };
     write_env_files(&team, &config, &tokens, &virtual_keys)?;
 
-    let compose = compose::render(&compose::Inputs { config: &config, git_rev });
+    let hub_files_hash = compose::files_hash(&[rin_json.as_bytes(), tokens_json.as_bytes()]);
+    let compose = compose::render(&compose::Inputs { config: &config, git_rev, hub_files_hash: &hub_files_hash });
     write_if_changed(&team.compose_file(), compose.as_bytes())?;
 
     team::set_current(home, &config.name)?;
@@ -374,6 +377,28 @@ mod tests {
         }
         // Bifrost's virtual keys are not tokens: they stay.
         assert_eq!(old_vk, f.read("bifrost/bifrost.env"));
+    }
+
+    #[test]
+    fn the_hub_is_recreated_when_its_files_change() {
+        // The hub reads rin.json and tokens.json only at start; Compose
+        // recreates it on `rin up` only if its service definition changes.
+        let f = Fixture::new("hub-files");
+        let label = |f: &Fixture| {
+            let compose = f.read("docker-compose.yml");
+            compose.lines().find(|l| l.contains("rin.files:")).unwrap().to_string()
+        };
+        f.generate().unwrap();
+        let first = label(&f);
+        f.generate().unwrap();
+        assert_eq!(first, label(&f));
+        f.edit("maxHops: 5", "maxHops: 2");
+        f.generate().unwrap();
+        let second = label(&f);
+        assert_ne!(first, second);
+        fs::remove_file(f.team().join("tokens.json")).unwrap();
+        f.generate().unwrap();
+        assert_ne!(second, label(&f));
     }
 
     #[test]

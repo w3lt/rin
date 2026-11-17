@@ -11,6 +11,18 @@ pub struct Inputs<'a> {
     pub config: &'a Config,
     /// Git revision of Rin the images build `rin` from (`v<version>` for releases).
     pub git_rev: &'a str,
+    /// Changes whenever `rin.json` or `tokens.json` does. The hub reads them
+    /// only at start, so this label makes `rin up` recreate it.
+    pub hub_files_hash: &'a str,
+}
+
+/// FNV-1a over `parts`, as 16 hex digits: stable across Rin builds, for change detection only.
+pub fn files_hash(parts: &[&[u8]]) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in parts.iter().flat_map(|part| part.iter().chain(&[0xff])) {
+        hash = (hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3);
+    }
+    format!("{hash:016x}")
 }
 
 /// Non-secret environment for an agent's container.
@@ -54,6 +66,7 @@ pub fn render(inputs: &Inputs) -> String {
             ("image", s(format!("rin-{}-hub:{version}", config.name))),
             ("hostname", s("hub")),
             ("init", Yaml::Raw("true".into())),
+            ("labels", map([("rin.files", s(inputs.hub_files_hash))])),
             ("environment", map([
                 ("RIN_CONFIG", s("/etc/rin/rin.json")),
                 ("RIN_TOKENS", s("/etc/rin/tokens.json")),
