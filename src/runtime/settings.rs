@@ -99,6 +99,9 @@ pub fn apply(home: &Path, settings: &Settings) -> Result<Vec<PathBuf>> {
                 s.insert("model".into(), json!(settings.model));
                 if settings.bifrost.is_some() {
                     s.insert("modelProvider".into(), json!("gemini"));
+                } else if s.get("modelProvider") == Some(&json!("gemini")) {
+                    // Switched back to a subscription: stop using the API key.
+                    s.remove("modelProvider");
                 }
             })?;
         }
@@ -293,5 +296,9 @@ mod tests {
         let config = read_json(home.join(".gemini/antigravity-cli/settings.json"));
         assert_eq!(config["model"], "gemini-3-pro");
         assert_eq!(config["modelProvider"], "gemini");
+
+        apply(&home, &settings(Harness::Antigravity, "gemini-3-pro", None)).unwrap();
+        let config = read_json(home.join(".gemini/antigravity-cli/settings.json"));
+        assert!(config.get("modelProvider").is_none(), "{config}");
     }
 }
