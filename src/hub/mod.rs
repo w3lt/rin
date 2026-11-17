@@ -328,6 +328,7 @@ pub fn router(hub: Arc<Hub>) -> Router {
         .route("/messages", post(post_messages))
         .route("/agents", get(get_agents))
         .route("/log", get(get_log))
+        .layer(axum::extract::DefaultBodyLimit::max(crate::proto::MAX_BODY))
         .with_state(hub)
 }
 

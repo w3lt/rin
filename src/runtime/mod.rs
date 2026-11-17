@@ -209,7 +209,9 @@ fn kill_marked(marker: &str) {
 }
 
 pub fn router(runtime: Arc<Runtime>) -> Router {
-    Router::new().route("/run", post(post_run)).with_state(runtime)
+    // A bit above the hub's limit: the hub adds the sender's name and label to the text.
+    let limit = axum::extract::DefaultBodyLimit::max(crate::proto::MAX_BODY + (64 << 10));
+    Router::new().route("/run", post(post_run)).layer(limit).with_state(runtime)
 }
 
 fn error(status: StatusCode, text: String) -> Response {

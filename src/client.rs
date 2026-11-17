@@ -5,7 +5,7 @@
 use anyhow::{Result, anyhow, bail};
 use serde::de::DeserializeOwned;
 
-use crate::proto::{AgentsResponse, Event, SendRequest};
+use crate::proto::{AgentsResponse, Event, SendRequest, MAX_BODY};
 
 pub struct Client {
     url: String,
@@ -29,7 +29,20 @@ impl Client {
     /// the hub enforces the team's timeout).
     pub async fn send(&self, to: &str, text: &str, hops: u32) -> Result<String> {
         let request = SendRequest { to: to.to_string(), text: text.to_string(), hops };
-        let response = self.http.post(format!("{}/messages", self.url)).bearer_auth(&self.token).json(&request).send().await;
+        let body = serde_json::to_vec(&request)?;
+        // The hub would cut a bigger upload short, which reads as "cannot reach the hub".
+        if body.len() > MAX_BODY {
+            let kib = |n: usize| format!("{} KiB", n.div_ceil(1024));
+            bail!("message too long: {} as JSON, the hub takes at most {}", kib(body.len()), kib(MAX_BODY));
+        }
+        let response = self
+            .http
+            .post(format!("{}/messages", self.url))
+            .bearer_auth(&self.token)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(body)
+            .send()
+            .await;
         let body: serde_json::Value = self.read(response).await?;
         body.get("reply")
             .and_then(serde_json::Value::as_str)
@@ -59,7 +72,7 @@ impl Client {
         Ok(self.read::<Log>(response).await?.events)
     }
 
-    async fn read<T: DeserializeOwned>(&self, response: reqwest::Result<reqwest::Response>) -> Result<T> {
+    pub(crate) async fn read<T: DeserializeOwned>(&self, response: reqwest::Result<reqwest::Response>) -> Result<T> {
         let response = response.map_err(|e| anyhow!("cannot reach the hub at {}: {}", self.url, root_cause(&e)))?;
         let status = response.status();
         let text = response.text().await.map_err(|e| anyhow!("bad answer from the hub ({status}): {e}"))?;

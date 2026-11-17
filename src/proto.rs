@@ -4,10 +4,15 @@
 
 use serde::{Deserialize, Serialize};
 
-/// `POST /messages` (sender → hub). Who is sending comes from the token, never the body.
 /// The most events one `GET /log` returns; ask again with `after` for more.
 pub const LOG_PAGE: usize = 500;
 
+/// The largest `POST /messages` body the hub takes (the runtime takes a bit more).
+/// Harnesses get the message as one command-line argument, which Linux caps
+/// at 128 KiB, so this leaves room for the prompt's header.
+pub const MAX_BODY: usize = 120 << 10;
+
+/// `POST /messages` (sender → hub). Who is sending comes from the token, never the body.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SendRequest {
     pub to: String,

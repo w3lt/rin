@@ -282,10 +282,23 @@ async fn queued_messages_with_time_left_run_when_a_slot_frees() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn plain_text_errors_from_the_hub_are_shown() {
+async fn too_long_messages_are_refused_before_sending() {
     let t = team("too-big", Duration::from_secs(10)).await;
     let err = t.user().send("b", &"x".repeat(3 << 20), 1).await.unwrap_err().to_string();
-    assert!(err.starts_with("the hub answered 413 Payload Too Large: "), "{err}");
+    assert!(err.starts_with("message too long: 3073 KiB as JSON, the hub takes at most 120 KiB"), "{err}");
+    assert!(t.user().log(None, 0).await.unwrap().is_empty(), "nothing reached the hub");
+    // Just under the limit gets all the way through the harness's command line.
+    let reply = t.user().send("b", &"x".repeat(crate::proto::MAX_BODY - 100), 1).await.unwrap();
+    assert!(reply.contains("| xxx"), "{}", &reply[..80]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn plain_text_errors_from_the_hub_are_shown() {
+    // Errors raised before the hub's handlers (here: a bad query string) aren't JSON.
+    let t = team("plain", Duration::from_secs(10)).await;
+    let response = reqwest::Client::new().get(format!("{}/log?after=abc", t.hub_url)).bearer_auth(&t.user_token).send().await;
+    let err = t.user().read::<serde_json::Value>(response).await.unwrap_err().to_string();
+    assert!(err.starts_with("the hub answered 400 Bad Request: "), "{err}");
 }
 
 #[tokio::test(flavor = "multi_thread")]
