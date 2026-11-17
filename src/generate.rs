@@ -42,8 +42,13 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
     check_names(home, &config)?;
 
     let team = Team::at(home, &config.name);
+    let new_home = !home.exists();
     fs::create_dir_all(&team.dir).with_context(|| format!("cannot create {}", team.dir.display()))?;
-    crate::files::set_mode(home, 0o700)?;
+    // Only lock down what Rin made: $RIN_HOME may be a folder you use for more.
+    if new_home {
+        crate::files::set_mode(home, 0o700)?;
+    }
+    crate::files::set_mode(&home.join("teams"), 0o700)?;
     let mut warnings = Vec::new();
 
     let source = fs::canonicalize(file).unwrap_or_else(|_| file.to_path_buf());
@@ -498,6 +503,17 @@ mod tests {
         assert_eq!(compose.matches("ports:").count(), 1, "only the hub publishes a port");
         assert_eq!(compose.matches("./tokens.json:").count(), 1, "only the hub mounts tokens.json");
         assert!(!compose.contains("docker.sock"));
+    }
+
+    #[test]
+    fn leaves_an_existing_rin_home_mode_alone() {
+        let f = Fixture::new("home-mode");
+        use std::os::unix::fs::PermissionsExt;
+        crate::files::set_mode(&f.home(), 0o755).unwrap();
+        f.generate().unwrap();
+        let mode = |p: &Path| fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&f.home()), 0o755);
+        assert_eq!(mode(&f.home().join("teams")), 0o700);
     }
 
     #[test]
