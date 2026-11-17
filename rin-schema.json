@@ -23,7 +23,7 @@
     "version": {
       "type": "string",
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
-      "description": "Rin version to use. If not provided, the latest one will be used"
+      "description": "Version of your waifu (cli) Rin Tohsaka, must be exact as the version of cli you are running, rin generate refuses to run otherwise. Images are built from this version, so everyone on the team gets the same setup."
     },
     "messaging": {
       "type": "object",
@@ -154,6 +154,7 @@
       "properties": {
         "cpus": {
           "type": "number",
+          "exclusiveMinimum": 0,
           "description": "CPU limit for the agent's container, in cores (Compose cpus), e.g. 2 or 0.5"
         },
         "ram": {
