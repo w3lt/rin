@@ -1,7 +1,8 @@
 //! Who is calling: the hub maps the bearer token to an agent (or you) and
 //! checks the request comes from that agent's own container.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::sync::Mutex;
 use std::net::IpAddr;
 use std::time::Duration;
 
@@ -24,7 +25,9 @@ impl Principal {
 /// Finds containers on the Compose network.
 pub enum Resolver {
     /// Docker's DNS, asked on every request so restarted containers' new IPs are picked up.
-    Dns,
+    /// `seen` keeps every IP an agent or Bifrost has had, so a failed lookup
+    /// never lets your token in from a container.
+    Dns { seen: Mutex<HashSet<IpAddr>> },
     /// Fixed addresses and runtime URLs, for tests.
     #[cfg_attr(not(test), allow(dead_code))]
     Static { ips: HashMap<String, IpAddr>, run_urls: HashMap<String, String> },
@@ -40,27 +43,39 @@ async fn lookup(host: String) -> Option<IpAddr> {
 }
 
 impl Resolver {
+    pub fn dns() -> Resolver {
+        Resolver::Dns { seen: Mutex::new(HashSet::new()) }
+    }
+
     pub async fn ip(&self, host: &str) -> Option<IpAddr> {
         match self {
-            Resolver::Dns => lookup(host.to_string()).await,
+            Resolver::Dns { seen } => {
+                let ip = lookup(host.to_string()).await?;
+                seen.lock().unwrap_or_else(|e| e.into_inner()).insert(ip);
+                Some(ip)
+            }
             Resolver::Static { ips, .. } => ips.get(host).copied(),
         }
     }
 
-    /// Whether `peer` is any of `hosts`, looked up concurrently.
+    /// Whether `peer` is, or ever was, any of `hosts`; looked up concurrently.
     pub async fn is_any(&self, hosts: &[&str], peer: IpAddr) -> bool {
         match self {
-            Resolver::Dns => {
+            Resolver::Dns { seen } => {
+                let known = |seen: &Mutex<HashSet<IpAddr>>| seen.lock().unwrap_or_else(|e| e.into_inner()).contains(&peer);
+                if known(seen) {
+                    return true;
+                }
                 let mut lookups = tokio::task::JoinSet::new();
                 for host in hosts {
                     lookups.spawn(lookup(host.to_string()));
                 }
                 while let Some(found) = lookups.join_next().await {
-                    if found.ok().flatten() == Some(peer) {
-                        return true;
+                    if let Ok(Some(ip)) = found {
+                        seen.lock().unwrap_or_else(|e| e.into_inner()).insert(ip);
                     }
                 }
-                false
+                known(seen)
             }
             Resolver::Static { ips, .. } => hosts.iter().any(|h| ips.get(*h) == Some(&peer)),
         }
@@ -69,7 +84,7 @@ impl Resolver {
     /// Where agent `id`'s runtime listens.
     pub fn run_url(&self, id: &str) -> String {
         match self {
-            Resolver::Dns => format!("http://{id}:7001/run"),
+            Resolver::Dns { .. } => format!("http://{id}:7001/run"),
             Resolver::Static { run_urls, .. } => run_urls.get(id).cloned().unwrap_or_default(),
         }
     }
@@ -144,5 +159,15 @@ mod tests {
         assert_eq!(auth(Some("tok-user"), "10.0.0.1").await, None);
         // An agent whose container is gone can't be anyone.
         assert_eq!(auth(Some("Bearer tok-rin"), "10.0.0.7").await, None);
+    }
+
+    #[tokio::test]
+    async fn an_address_once_seen_stays_a_container() {
+        let resolver = Resolver::dns();
+        let localhost = ip("127.0.0.1");
+        assert!(resolver.is_any(&["localhost"], localhost).await);
+        // The name no longer resolves (container stopped, DNS down): still not you.
+        assert!(resolver.is_any(&["rin-test-gone.invalid"], localhost).await);
+        assert!(!resolver.is_any(&["rin-test-gone.invalid"], ip("10.1.2.3")).await);
     }
 }

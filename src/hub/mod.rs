@@ -400,7 +400,7 @@ pub async fn main() -> Result<()> {
         serde_json::from_str(&text).with_context(|| format!("{tokens_path} is not a tokens file"))?;
     let db = Db::open(std::path::Path::new(&db_path))?;
 
-    let hub = Arc::new(Hub::new(config, tokens, Resolver::Dns, db));
+    let hub = Arc::new(Hub::new(config, tokens, Resolver::dns(), db));
     let ticker = hub.clone();
     tokio::spawn(async move {
         let mut every = tokio::time::interval(DEADLOCK_CHECK_EVERY);
