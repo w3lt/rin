@@ -31,6 +31,8 @@ use sched::{Admit, MsgId, Sched};
 /// Extra time the hub gives a runtime to report its own timeout before giving up on it.
 const RUNTIME_GRACE: Duration = Duration::from_secs(5);
 const DEADLOCK_CHECK_EVERY: Duration = Duration::from_secs(30);
+/// How often the hub looks up every container's address in the background.
+const ADDRESS_REFRESH_EVERY: Duration = Duration::from_secs(5);
 /// A queued message that only gets a slot with less than this much of its
 /// timeout left fails without starting: the session would be killed moments
 /// later, spending tokens on an answer nobody gets.
@@ -414,6 +416,18 @@ pub async fn main() -> Result<()> {
         loop {
             every.tick().await;
             ticker.check_deadlocks();
+        }
+    });
+
+    // Learn the containers' addresses before anyone asks, so a recreated hub isn't blind.
+    let refresher = hub.clone();
+    tokio::spawn(async move {
+        let hosts: Vec<String> = refresher.agent_ids.iter().cloned().chain(["bifrost".to_string()]).collect();
+        let hosts: Vec<&str> = hosts.iter().map(String::as_str).collect();
+        let mut every = tokio::time::interval(ADDRESS_REFRESH_EVERY);
+        loop {
+            every.tick().await;
+            refresher.resolver.refresh(&hosts).await;
         }
     });
 

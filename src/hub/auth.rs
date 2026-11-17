@@ -25,8 +25,9 @@ impl Principal {
 /// Finds containers on the Compose network.
 pub enum Resolver {
     /// Docker's DNS, asked on every request so restarted containers' new IPs are picked up.
-    /// `seen` keeps every IP an agent or Bifrost has had, so a failed lookup
-    /// never lets your token in from a container. `outside` remembers, briefly,
+    /// `seen` keeps every IP an agent or Bifrost has had (learned on requests and by
+    /// [`Resolver::refresh`] every few seconds), so a failed lookup doesn't let your
+    /// token in from a container the hub has seen. `outside` remembers, briefly,
     /// addresses just found to be none of them (yours), so `rin log -f` doesn't
     /// look up every container every second.
     Dns { seen: Mutex<HashSet<IpAddr>>, outside: Mutex<HashMap<IpAddr, Instant>> },
@@ -42,9 +43,20 @@ const LOOKUP_TIMEOUT: Duration = Duration::from_secs(2);
 /// How long an address found to be no container's is trusted as such.
 const OUTSIDE_FOR: Duration = Duration::from_secs(10);
 
-async fn lookup(host: String) -> Option<IpAddr> {
-    let addrs = tokio::time::timeout(LOOKUP_TIMEOUT, tokio::net::lookup_host((host.as_str(), 0))).await.ok()?.ok()?;
-    addrs.map(|addr| addr.ip().to_canonical()).find(IpAddr::is_ipv4)
+enum Found {
+    Ip(IpAddr),
+    /// The name doesn't resolve: that container isn't running.
+    Nothing,
+    /// No answer in time: don't conclude anything.
+    TimedOut,
+}
+
+async fn lookup(host: String) -> Found {
+    match tokio::time::timeout(LOOKUP_TIMEOUT, tokio::net::lookup_host((host.as_str(), 0))).await {
+        Err(_) => Found::TimedOut,
+        Ok(Err(_)) => Found::Nothing,
+        Ok(Ok(addrs)) => addrs.map(|addr| addr.ip().to_canonical()).find(IpAddr::is_ipv4).map_or(Found::Nothing, Found::Ip),
+    }
 }
 
 impl Resolver {
@@ -54,11 +66,13 @@ impl Resolver {
 
     pub async fn ip(&self, host: &str) -> Option<IpAddr> {
         match self {
-            Resolver::Dns { seen, .. } => {
-                let ip = lookup(host.to_string()).await?;
-                seen.lock().unwrap_or_else(|e| e.into_inner()).insert(ip);
-                Some(ip)
-            }
+            Resolver::Dns { seen, .. } => match lookup(host.to_string()).await {
+                Found::Ip(ip) => {
+                    seen.lock().unwrap_or_else(|e| e.into_inner()).insert(ip);
+                    Some(ip)
+                }
+                Found::Nothing | Found::TimedOut => None,
+            },
             Resolver::Static { ips, .. } => ips.get(host).copied(),
         }
     }
@@ -75,24 +89,37 @@ impl Resolver {
                 if outside.lock().unwrap_or_else(|e| e.into_inner()).get(&peer).is_some_and(fresh) {
                     return false;
                 }
-                let mut lookups = tokio::task::JoinSet::new();
-                for host in hosts {
-                    lookups.spawn(lookup(host.to_string()));
-                }
-                while let Some(found) = lookups.join_next().await {
-                    if let Ok(Some(ip)) = found {
-                        seen.lock().unwrap_or_else(|e| e.into_inner()).insert(ip);
-                    }
-                }
+                let answered = self.refresh(hosts).await;
                 let is_container = known(seen);
-                if !is_container {
-                    // Lookups run again once this is stale; see `seen` for why a stale "outside" is safe.
+                // Only a full answer says `peer` is outside; it's asked again once stale.
+                if !is_container && answered {
                     self.note_outside(peer);
                 }
                 is_container
             }
             Resolver::Static { ips, .. } => hosts.iter().any(|h| ips.get(*h) == Some(&peer)),
         }
+    }
+
+    /// Looks up `hosts` concurrently and remembers every address found.
+    /// False if any lookup went unanswered.
+    pub async fn refresh(&self, hosts: &[&str]) -> bool {
+        let Resolver::Dns { seen, .. } = self else { return true };
+        let mut lookups = tokio::task::JoinSet::new();
+        for host in hosts {
+            lookups.spawn(lookup(host.to_string()));
+        }
+        let mut answered = true;
+        while let Some(found) = lookups.join_next().await {
+            match found {
+                Ok(Found::Ip(ip)) => {
+                    seen.lock().unwrap_or_else(|e| e.into_inner()).insert(ip);
+                }
+                Ok(Found::Nothing) => {}
+                Ok(Found::TimedOut) | Err(_) => answered = false,
+            }
+        }
+        answered
     }
 
     fn note_outside(&self, peer: IpAddr) {
