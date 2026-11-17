@@ -170,7 +170,7 @@ async fn rejects_self_unknown_and_unreachable_receivers() {
     let err = t.user().send("down", "hi", 1).await.unwrap_err();
     assert!(err.to_string().starts_with("receiver down"), "{err}");
     let err = t.user().send("stale", "hi", 1).await.unwrap_err();
-    assert!(err.to_string().starts_with("session failed: stale refused the hub"), "{err}");
+    assert!(err.to_string().starts_with("session failed: stale refused the hub (not authorized: wrong token)"), "{err}");
     assert_eq!(t.hub.agents(&Principal::User).agents[2].sessions, 0, "the failed message gave its slot back");
 }
 
@@ -324,9 +324,11 @@ async fn runtime_rejects_anyone_but_the_hub() {
     let addr = serve(crate::runtime::router(Arc::new(runtime))).await;
     let http = reqwest::Client::new();
     let body = json!({ "from": "a", "fromLabel": "A", "text": "hi", "hops": 1, "timeoutMs": 1000 });
-    for token in ["tok", "wrong"] {
+    for (token, why) in [("tok", "not from the hub"), ("wrong", "wrong token")] {
         let response = http.post(format!("http://{addr}/run")).bearer_auth(token).json(&body).send().await.unwrap();
         assert_eq!(response.status(), 401);
+        let body: serde_json::Value = response.json().await.unwrap();
+        assert_eq!(body["error"], format!("not authorized: {why}"));
     }
     let _ = std::fs::remove_dir_all(&dir);
 }

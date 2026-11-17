@@ -238,10 +238,12 @@ impl Hub {
         match (status, body) {
             (StatusCode::OK, RunResponse { reply: Some(reply), .. }) => Ok(reply),
             (StatusCode::GATEWAY_TIMEOUT, _) => Err(self.timed_out(to)),
-            // Not your token: the runtime has an older tokens.json than the hub.
-            (StatusCode::UNAUTHORIZED, _) => Err(HubError::Session(format!(
-                "session failed: {to} refused the hub (its token doesn't match tokens.json); `rin up` restarts it with the current one"
-            ))),
+            // The runtime didn't take the hub's call: say why, and how to fix a stale token.
+            (StatusCode::UNAUTHORIZED, RunResponse { error, .. }) => {
+                let why = error.unwrap_or_else(|| "not authorized".into());
+                let hint = if why.contains("wrong token") { "; `rin up` restarts it with the current tokens.json" } else { "" };
+                Err(HubError::Session(format!("session failed: {to} refused the hub ({why}){hint}")))
+            }
             (_, RunResponse { error: Some(error), .. }) => Err(HubError::Session(error)),
             (status, _) => Err(HubError::Session(format!("session failed: {to} answered {status}"))),
         }

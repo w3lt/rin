@@ -74,18 +74,18 @@ impl Runtime {
     }
 
     /// Only the hub may call: with this agent's token, from the hub's address.
-    async fn authorized(&self, headers: &HeaderMap, peer: IpAddr) -> bool {
+    /// `Err` says which check failed.
+    async fn authorized(&self, headers: &HeaderMap, peer: IpAddr) -> Result<(), &'static str> {
         let expected = format!("Bearer {}", self.token);
         let given = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).unwrap_or("");
         if self.token.is_empty() || given != expected {
-            return false;
+            return Err("wrong token");
         }
-        let hub = tokio::net::lookup_host((self.hub_host.as_str(), 0))
+        let peer = peer.to_canonical();
+        let from_hub = tokio::net::lookup_host((self.hub_host.as_str(), 0))
             .await
-            .ok()
-            .and_then(|mut addrs| addrs.find(|a| a.is_ipv4()))
-            .map(|a| a.ip());
-        hub == Some(peer.to_canonical())
+            .is_ok_and(|mut addrs| addrs.any(|a| a.ip().to_canonical() == peer));
+        if from_hub { Ok(()) } else { Err("not from the hub") }
     }
 
     /// Runs one message as a fresh headless session and returns its final answer.
@@ -224,8 +224,8 @@ async fn post_run(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    if !runtime.authorized(&headers, peer.ip()).await {
-        return error(StatusCode::UNAUTHORIZED, "not authorized".into());
+    if let Err(why) = runtime.authorized(&headers, peer.ip()).await {
+        return error(StatusCode::UNAUTHORIZED, format!("not authorized: {why}"));
     }
     let request: RunRequest = match serde_json::from_slice(&body) {
         Ok(request) => request,
