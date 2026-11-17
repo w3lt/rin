@@ -77,13 +77,14 @@ pub fn up(team: &Team) -> Result<()> {
     }
     // --build: an agent that switched harness, or a new RIN_GIT_REV, needs a new
     // image under the same tag; unchanged images come straight from the cache.
+    // --remove-orphans: an agent taken out of rin.yml stops with the rest.
     let mut command = compose(team);
-    command.args(["up", "-d", "--build"]);
+    command.args(["up", "-d", "--build", "--remove-orphans"]);
     if let Err(e) = run(command) {
         if !already_up {
             // Leave nothing half-started behind.
             let mut down = compose(team);
-            down.arg("down");
+            down.args(["down", "--remove-orphans"]);
             let _ = down.status();
         }
         bail!(
@@ -106,7 +107,7 @@ fn others_up(team: &Team) -> String {
 
 pub fn down(team: &Team) -> Result<()> {
     let mut command = compose(team);
-    command.arg("down");
+    command.args(["down", "--remove-orphans"]);
     run(command)
 }
 
