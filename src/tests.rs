@@ -282,6 +282,13 @@ async fn queued_messages_with_time_left_run_when_a_slot_frees() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn plain_text_errors_from_the_hub_are_shown() {
+    let t = team("too-big", Duration::from_secs(10)).await;
+    let err = t.user().send("b", &"x".repeat(3 << 20), 1).await.unwrap_err().to_string();
+    assert!(err.starts_with("the hub answered 413 Payload Too Large: "), "{err}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn tokens_are_checked() {
     let t = team("auth", Duration::from_secs(10)).await;
     // No token, garbage, and an agent's token from outside its container.

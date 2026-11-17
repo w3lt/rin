@@ -62,7 +62,13 @@ impl Client {
     async fn read<T: DeserializeOwned>(&self, response: reqwest::Result<reqwest::Response>) -> Result<T> {
         let response = response.map_err(|e| anyhow!("cannot reach the hub at {}: {}", self.url, root_cause(&e)))?;
         let status = response.status();
-        let body: serde_json::Value = response.json().await.map_err(|e| anyhow!("bad answer from the hub ({status}): {e}"))?;
+        let text = response.text().await.map_err(|e| anyhow!("bad answer from the hub ({status}): {e}"))?;
+        let body: serde_json::Value = match serde_json::from_str(&text) {
+            Ok(body) => body,
+            // Errors raised before the hub's handlers (body too large, ...) are plain text.
+            Err(_) if !status.is_success() => bail!("the hub answered {status}: {}", text.trim()),
+            Err(e) => bail!("bad answer from the hub ({status}): {e}"),
+        };
         if !status.is_success() {
             match body.get("error").and_then(serde_json::Value::as_str) {
                 Some(error) => bail!("{error}"),
