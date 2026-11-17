@@ -7,6 +7,8 @@ message each other. Design and success criteria: issue #1.
 
 ## Use
 
+Needs Docker with Compose 2.24 or later (Docker Desktop, or Docker Engine with the Compose plugin).
+
 ```sh
 cargo install --git https://github.com/w3lt/rin --tag v0.1.0 rin
 
