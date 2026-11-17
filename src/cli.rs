@@ -82,10 +82,6 @@ pub fn up(team: &Team) -> Result<()> {
     // --remove-orphans: an agent taken out of rin.yml stops with the rest.
     let mut command = compose(team);
     command.args(["up", "-d", "--build", "--remove-orphans"]);
-    let keys_env = team.dir.join("../../keys.env");
-    if !keys_env.is_file() && team.config().is_ok_and(|c| c.uses_api_keys()) {
-        eprintln!("rin: warning: {} is missing: API-key agents will fail until you add your provider keys and run `rin up` again", keys_env.display());
-    }
     if let Err(e) = run(command) {
         if !any_up {
             // Leave nothing half-started behind (but never stop what was already running).
@@ -93,12 +89,20 @@ pub fn up(team: &Team) -> Result<()> {
             down.args(["down", "--remove-orphans"]);
             let _ = down.status();
         }
-        let state = if any_up { "is only partly up (what was already running is left as it was)" } else { "is not up" };
+        let state = if any_up { "may not be fully up (`rin status` shows what runs)" } else { "is not up" };
         bail!(
             "{e}\nteam {} {state}; if the error is about port {}, another Rin team or program is using it{}",
             team.name,
             team::HUB_PORT,
             others_up(team)
+        );
+    }
+    // Last, so the build output doesn't scroll it away.
+    let keys_env = team::rin_home()?.join("keys.env");
+    if !keys_env.is_file() && team.config().is_ok_and(|c| c.uses_api_keys()) {
+        eprintln!(
+            "rin: warning: {} is missing: API-key agents will fail. Add your provider keys, then run `rin generate` and `rin up`",
+            keys_env.display()
         );
     }
     Ok(())
