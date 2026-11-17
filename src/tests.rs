@@ -111,7 +111,6 @@ impl Team {
         self.hub.send(&principal, SendRequest { to: to.into(), text: text.into(), hops }).await
     }
 
-    /// Sessions the fake harness started, in order (all agents share it).
     /// Waits for the process the fake harness recorded in `sleep.pid` to be gone.
     async fn sleep_killed(&self) {
         let pid: i32 = std::fs::read_to_string(self.dir.join("sleep.pid")).unwrap().trim().parse().unwrap();
@@ -123,6 +122,7 @@ impl Team {
         tokio::time::timeout(Duration::from_secs(3), gone).await.expect("the session's process was killed");
     }
 
+    /// Sessions the fake harness started, in order (all agents share it).
     fn starts(&self) -> Vec<String> {
         std::fs::read_to_string(self.dir.join("starts")).unwrap_or_default().lines().map(str::to_string).collect()
     }
