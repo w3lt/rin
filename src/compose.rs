@@ -133,7 +133,11 @@ pub fn render(inputs: &Inputs) -> String {
             map([
                 ("image", s(BIFROST_IMAGE)),
                 ("hostname", s("bifrost")),
-                ("env_file", list([s("../../keys.env"), s("./bifrost/bifrost.env")])),
+                // Optional: a missing keys.env must not stop Compose (and `rin down`) from loading the project.
+                ("env_file", list([
+                    map([("path", s("../../keys.env")), ("required", Yaml::Raw("false".into()))]),
+                    s("./bifrost/bifrost.env"),
+                ])),
                 ("volumes", list([
                     s(format!("{}:/app/data", volume_name(config, "bifrost"))),
                     s("./bifrost/config.json:/app/data/config.json:ro"),

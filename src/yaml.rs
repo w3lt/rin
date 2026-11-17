@@ -70,8 +70,13 @@ fn scalar(yaml: &Yaml) -> String {
     match yaml {
         Yaml::Str(text) => quote(text),
         Yaml::Raw(text) => text.clone(),
-        // Nested collections inside lists are not needed by the Compose file.
-        Yaml::Map(_) | Yaml::List(_) => unreachable!("only scalars in lists"),
+        // A map in a list (`env_file: [{path, required}]`), as a flow mapping.
+        Yaml::Map(entries) => {
+            let entries: Vec<String> = entries.iter().map(|(k, v)| format!("{}: {}", quote_key(k), scalar(v))).collect();
+            format!("{{ {} }}", entries.join(", "))
+        }
+        // Lists in lists are not needed by the Compose file.
+        Yaml::List(_) => unreachable!("no lists in lists"),
     }
 }
 
@@ -117,6 +122,12 @@ mod tests {
             doc.render(),
             "name: rin-my-team\nservices:\n  hub:\n    ports:\n      - \"127.0.0.1:10302:7000\"\n    init: true\n    command:\n      - rin\n      - hub\n    environment:\n      A: \"on\"\n      B: \"4g\"\n      C: http://hub:7000\n    empty: {}\n"
         );
+    }
+
+    #[test]
+    fn renders_maps_in_lists_as_flow_mappings() {
+        let doc = map([("env_file", list([map([("path", s("../../keys.env")), ("required", Yaml::Raw("false".into()))]), s("./b.env")]))]);
+        assert_eq!(doc.render(), "env_file:\n  - { path: ../../keys.env, required: false }\n  - ./b.env\n");
     }
 
     #[test]

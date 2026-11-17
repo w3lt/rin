@@ -490,6 +490,8 @@ mod tests {
             "        RIN_GIT_REV: v0.1.0\n",
             "  rin-my-team-hub:\n    name: rin-my-team-hub\n",
             "  bifrost:\n",
+            // A missing keys.env must not stop Compose from loading the project.
+            "      - { path: ../../keys.env, required: false }\n",
         ] {
             assert!(compose.contains(line), "no {line:?} in\n{compose}");
         }
