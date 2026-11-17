@@ -6,19 +6,58 @@
   "additionalProperties": false,
   "required": [
     "rin",
-    "swarm"
+    "name",
+    "agents"
   ],
   "properties": {
     "rin": {
       "type": "string",
       "const": "tohsaka"
     },
-    "swarm": {
+    "name": {
+      "type": "string",
+      "description": "The name of workspace, you can use multiple workspace with Rin"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Rin version to use. If not provided, the latest one will be used"
+    },
+    "messaging": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout": {
+          "type": "string",
+          "pattern": "^[0-9]+m$",
+          "default": "30m"
+        },
+        "maxHops": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5
+        }
+      }
+    },
+    "agents": {
       "type": "array",
       "minItems": 1,
       "items": {
         "$ref": "#/$defs/agent"
-      }
+      },
+      "contains": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "const": "leader"
+          }
+        }
+      },
+      "minContains": 1,
+      "maxContains": 1
     }
   },
   "$defs": {
@@ -31,11 +70,13 @@
         "label",
         "resources",
         "harness",
-        "authentication"
+        "authentication",
+        "model"
       ],
       "properties": {
         "id": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]"
         },
         "type": {
           "enum": [
@@ -64,10 +105,34 @@
             "apiKey"
           ]
         },
-        "apiKey": {
-          "type": "string",
-          "description": "Provide this only if authentication is apiKey"
+        "model": {
+          "type": "string"
+        },
+        "maxSessions": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3
         }
+      },
+      "if": {
+        "properties": {
+          "harness": {
+            "const": "pi"
+          }
+        },
+        "required": [
+          "harness"
+        ]
+      },
+      "then": {
+        "properties": {
+          "authentication": {
+            "const": "apiKey"
+          }
+        },
+        "required": [
+          "authentication"
+        ]
       }
     },
     "resources": {
@@ -78,17 +143,9 @@
           "type": "string",
           "description": "The CPU amount that will be allocated for this machine"
         },
-        "gpu": {
-          "type": "string",
-          "description": "Only if you have GPU"
-        },
         "ram": {
           "type": "string",
           "description": "The RAM amount that will be allocated for this machine"
-        },
-        "storage": {
-          "type": "string",
-          "description": "The amount of storage (RAM exclusive) that will be allocated for this machine"
         }
       }
     }
