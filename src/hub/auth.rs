@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::net::IpAddr;
+use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Principal {
@@ -29,15 +30,39 @@ pub enum Resolver {
     Static { ips: HashMap<String, IpAddr>, run_urls: HashMap<String, String> },
 }
 
+/// A stopped container's name is unknown to Docker's DNS, which may ask
+/// upstream; don't let that hold up a request.
+const LOOKUP_TIMEOUT: Duration = Duration::from_secs(2);
+
+async fn lookup(host: String) -> Option<IpAddr> {
+    let addrs = tokio::time::timeout(LOOKUP_TIMEOUT, tokio::net::lookup_host((host.as_str(), 0))).await.ok()?.ok()?;
+    addrs.map(|addr| addr.ip().to_canonical()).find(IpAddr::is_ipv4)
+}
+
 impl Resolver {
     pub async fn ip(&self, host: &str) -> Option<IpAddr> {
         match self {
-            Resolver::Dns => tokio::net::lookup_host((host, 0))
-                .await
-                .ok()?
-                .map(|addr| addr.ip().to_canonical())
-                .find(IpAddr::is_ipv4),
+            Resolver::Dns => lookup(host.to_string()).await,
             Resolver::Static { ips, .. } => ips.get(host).copied(),
+        }
+    }
+
+    /// Whether `peer` is any of `hosts`, looked up concurrently.
+    pub async fn is_any(&self, hosts: &[&str], peer: IpAddr) -> bool {
+        match self {
+            Resolver::Dns => {
+                let mut lookups = tokio::task::JoinSet::new();
+                for host in hosts {
+                    lookups.spawn(lookup(host.to_string()));
+                }
+                while let Some(found) = lookups.join_next().await {
+                    if found.ok().flatten() == Some(peer) {
+                        return true;
+                    }
+                }
+                false
+            }
+            Resolver::Static { ips, .. } => hosts.iter().any(|h| ips.get(*h) == Some(&peer)),
         }
     }
 
@@ -66,12 +91,8 @@ pub async fn authenticate(
         Principal::Agent(id) => (resolver.ip(id).await == Some(peer)).then_some(principal),
         Principal::User => {
             // Your token is only good from outside the team's containers.
-            for host in agents.iter().map(String::as_str).chain(["bifrost"]) {
-                if resolver.ip(host).await == Some(peer) {
-                    return None;
-                }
-            }
-            Some(principal)
+            let hosts: Vec<&str> = agents.iter().map(String::as_str).chain(["bifrost"]).collect();
+            (!resolver.is_any(&hosts, peer).await).then_some(principal)
         }
     }
 }
