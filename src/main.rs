@@ -18,5 +18,9 @@ mod hub;
 mod signals;
 #[cfg(feature = "agent")]
 mod runtime;
+mod client;
+mod display;
+#[cfg(feature = "agent")]
+mod mcp;
 
 fn main() {}
