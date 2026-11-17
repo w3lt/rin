@@ -49,6 +49,11 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
         crate::files::set_mode(home, 0o700)?;
     }
     crate::files::set_mode(&home.join("teams"), 0o700)?;
+    // Your provider keys: whoever made the file, only you may read it.
+    let keys_env = home.join("keys.env");
+    if keys_env.is_file() {
+        crate::files::set_mode(&keys_env, 0o600)?;
+    }
     let mut warnings = Vec::new();
 
     let source = fs::canonicalize(file).unwrap_or_else(|_| file.to_path_buf());
@@ -63,7 +68,6 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
     write_private(&team.tokens_file(), tokens_json.as_bytes())?;
 
     let virtual_keys = if config.uses_api_keys() {
-        let keys_env = home.join("keys.env");
         let providers = provider_names(&keys_env);
         let names = PROVIDER_KEYS.map(|(var, _)| var).join(", ");
         if !keys_env.is_file() {
@@ -514,6 +518,8 @@ mod tests {
         let mode = |p: &Path| fs::metadata(p).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode(&f.home()), 0o755);
         assert_eq!(mode(&f.home().join("teams")), 0o700);
+        // The fixture wrote keys.env with the default umask.
+        assert_eq!(mode(&f.home().join("keys.env")), 0o600);
     }
 
     #[test]

@@ -12,8 +12,9 @@ Needs Docker with Compose 2.24 or later (Docker Desktop, or Docker Engine with t
 ```sh
 cargo install --git https://github.com/w3lt/rin --tag v0.1.0 rin
 
-# API-key agents only: provider keys, read by Bifrost alone
-mkdir -p ~/.rin && cat >> ~/.rin/keys.env <<'EOF'
+# API-key agents only: provider keys, read by Bifrost alone (rin generate keeps the file 0600)
+mkdir -p -m 700 ~/.rin && touch ~/.rin/keys.env && chmod 600 ~/.rin/keys.env
+cat >> ~/.rin/keys.env <<'EOF'
 ANTHROPIC_API_KEY=...
 EOF
 
