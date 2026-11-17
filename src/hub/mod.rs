@@ -43,7 +43,8 @@ pub struct Hub {
     config: Config,
     /// `messaging.timeout` (tests shorten it).
     pub(crate) timeout: Duration,
-    agent_ids: Vec<String>,
+    /// Hostnames of the team's containers: the agents, and Bifrost if it runs.
+    containers: Vec<String>,
     /// token → who holds it
     principals: HashMap<String, Principal>,
     /// agent id → its token, used to call its runtime
@@ -114,10 +115,14 @@ impl Hub {
             }
         }
         let sched = Sched::new(config.agents.iter().map(|a| (a.id.as_str(), a.max_sessions as usize)));
+        let mut containers = agent_ids.clone();
+        if config.uses_api_keys() {
+            containers.push("bifrost".to_string());
+        }
         Hub {
+            containers,
             timeout: config.messaging.timeout(),
             config,
-            agent_ids,
             principals,
             agent_tokens,
             resolver,
@@ -134,7 +139,7 @@ impl Hub {
 
     pub async fn authenticate(&self, headers: &HeaderMap, peer: IpAddr) -> Result<Principal, HubError> {
         let authorization = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok());
-        auth::authenticate(&self.resolver, &self.principals, &self.agent_ids, authorization, peer)
+        auth::authenticate(&self.resolver, &self.principals, &self.containers, authorization, peer)
             .await
             .ok_or(HubError::NotAuthorized)
     }
@@ -422,8 +427,7 @@ pub async fn main() -> Result<()> {
     // Learn the containers' addresses before anyone asks, so a recreated hub isn't blind.
     let refresher = hub.clone();
     tokio::spawn(async move {
-        let hosts: Vec<String> = refresher.agent_ids.iter().cloned().chain(["bifrost".to_string()]).collect();
-        let hosts: Vec<&str> = hosts.iter().map(String::as_str).collect();
+        let hosts: Vec<&str> = refresher.containers.iter().map(String::as_str).collect();
         let mut every = tokio::time::interval(ADDRESS_REFRESH_EVERY);
         loop {
             every.tick().await;

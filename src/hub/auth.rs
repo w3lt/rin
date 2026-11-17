@@ -43,20 +43,10 @@ const LOOKUP_TIMEOUT: Duration = Duration::from_secs(2);
 /// How long an address found to be no container's is trusted as such.
 const OUTSIDE_FOR: Duration = Duration::from_secs(10);
 
-enum Found {
-    Ip(IpAddr),
-    /// The name doesn't resolve: that container isn't running.
-    Nothing,
-    /// No answer in time: don't conclude anything.
-    TimedOut,
-}
-
-async fn lookup(host: String) -> Found {
-    match tokio::time::timeout(LOOKUP_TIMEOUT, tokio::net::lookup_host((host.as_str(), 0))).await {
-        Err(_) => Found::TimedOut,
-        Ok(Err(_)) => Found::Nothing,
-        Ok(Ok(addrs)) => addrs.map(|addr| addr.ip().to_canonical()).find(IpAddr::is_ipv4).map_or(Found::Nothing, Found::Ip),
-    }
+/// The container's IPv4 address; `None` if the name doesn't resolve in time.
+async fn lookup(host: String) -> Option<IpAddr> {
+    let addrs = tokio::time::timeout(LOOKUP_TIMEOUT, tokio::net::lookup_host((host.as_str(), 0))).await.ok()?.ok()?;
+    addrs.map(|addr| addr.ip().to_canonical()).find(IpAddr::is_ipv4)
 }
 
 impl Resolver {
@@ -66,13 +56,11 @@ impl Resolver {
 
     pub async fn ip(&self, host: &str) -> Option<IpAddr> {
         match self {
-            Resolver::Dns { seen, .. } => match lookup(host.to_string()).await {
-                Found::Ip(ip) => {
-                    seen.lock().unwrap_or_else(|e| e.into_inner()).insert(ip);
-                    Some(ip)
-                }
-                Found::Nothing | Found::TimedOut => None,
-            },
+            Resolver::Dns { seen, .. } => {
+                let ip = lookup(host.to_string()).await?;
+                seen.lock().unwrap_or_else(|e| e.into_inner()).insert(ip);
+                Some(ip)
+            }
             Resolver::Static { ips, .. } => ips.get(host).copied(),
         }
     }
@@ -89,10 +77,11 @@ impl Resolver {
                 if outside.lock().unwrap_or_else(|e| e.into_inner()).get(&peer).is_some_and(fresh) {
                     return false;
                 }
-                let answered = self.refresh(hosts).await;
+                self.refresh(hosts).await;
                 let is_container = known(seen);
-                // Only a full answer says `peer` is outside; it's asked again once stale.
-                if !is_container && answered {
+                if !is_container {
+                    // Even after a timed-out lookup: the refresher keeps `seen` current,
+                    // and `seen` is checked first, so a container can't hide behind this.
                     self.note_outside(peer);
                 }
                 is_container
@@ -102,24 +91,17 @@ impl Resolver {
     }
 
     /// Looks up `hosts` concurrently and remembers every address found.
-    /// False if any lookup went unanswered.
-    pub async fn refresh(&self, hosts: &[&str]) -> bool {
-        let Resolver::Dns { seen, .. } = self else { return true };
+    pub async fn refresh(&self, hosts: &[&str]) {
+        let Resolver::Dns { seen, .. } = self else { return };
         let mut lookups = tokio::task::JoinSet::new();
         for host in hosts {
             lookups.spawn(lookup(host.to_string()));
         }
-        let mut answered = true;
         while let Some(found) = lookups.join_next().await {
-            match found {
-                Ok(Found::Ip(ip)) => {
-                    seen.lock().unwrap_or_else(|e| e.into_inner()).insert(ip);
-                }
-                Ok(Found::Nothing) => {}
-                Ok(Found::TimedOut) | Err(_) => answered = false,
+            if let Ok(Some(ip)) = found {
+                seen.lock().unwrap_or_else(|e| e.into_inner()).insert(ip);
             }
         }
-        answered
     }
 
     fn note_outside(&self, peer: IpAddr) {
@@ -140,11 +122,11 @@ impl Resolver {
 }
 
 /// Identifies the caller from its `Authorization` header and source IP.
-/// `agents` are all agent ids; `tokens` maps token → principal.
+/// `containers` are the team's container hostnames; `tokens` maps token → principal.
 pub async fn authenticate(
     resolver: &Resolver,
     tokens: &HashMap<String, Principal>,
-    agents: &[String],
+    containers: &[String],
     authorization: Option<&str>,
     peer: IpAddr,
 ) -> Option<Principal> {
@@ -155,7 +137,7 @@ pub async fn authenticate(
         Principal::Agent(id) => (resolver.ip(id).await == Some(peer)).then_some(principal),
         Principal::User => {
             // Your token is only good from outside the team's containers.
-            let hosts: Vec<&str> = agents.iter().map(String::as_str).chain(["bifrost"]).collect();
+            let hosts: Vec<&str> = containers.iter().map(String::as_str).collect();
             (!resolver.is_any(&hosts, peer).await).then_some(principal)
         }
     }
@@ -186,7 +168,7 @@ mod tests {
         .into_iter()
         .map(|(k, v)| (k.to_string(), v))
         .collect();
-        let agents = vec!["rin".to_string(), "backend".to_string()];
+        let agents = vec!["rin".to_string(), "backend".to_string(), "bifrost".to_string()];
         let auth = |header: Option<&'static str>, peer: &'static str| {
             let (resolver, tokens, agents) = (&resolver, &tokens, &agents);
             async move { authenticate(resolver, tokens, agents, header, ip(peer)).await }
