@@ -3,7 +3,7 @@
 Rin (Tohsaka) stands up a team of AI agents on your machine from one config
 file: one Docker container per agent, each running Claude Code, Codex,
 Antigravity or pi. One agent leads; you can talk to any of them, and they can
-message each other. Design: `docs/superpowers/specs/2026-11-17-rin-v0-design.md`.
+message each other. Design and success criteria: issue #1.
 
 ## Use
 
@@ -11,7 +11,7 @@ message each other. Design: `docs/superpowers/specs/2026-11-17-rin-v0-design.md`
 cargo install --git https://github.com/w3lt/rin --tag v0.1.0 rin
 
 # API-key agents only: provider keys, read by Bifrost alone
-cat >> ~/.rin/keys.env <<'EOF'
+mkdir -p ~/.rin && cat >> ~/.rin/keys.env <<'EOF'
 ANTHROPIC_API_KEY=...
 EOF
 
@@ -46,4 +46,8 @@ The binary has three feature sets: `host` (default: the commands above),
 
 Images build `rin` from the `v<version>` tag. To try unreleased changes, point
 them at another revision when generating, e.g.
-`RIN_GIT_REV=refs/heads/my-branch rin generate --instructions agents`.
+`RIN_GIT_REV=refs/heads/my-branch rin generate --instructions agents`. Docker
+caches that build step by its command line, so after pushing new commits to
+the same branch rebuild with
+`docker compose -p rin-<name> -f ~/.rin/teams/<name>/docker-compose.yml build --no-cache`
+(or use a commit hash as the revision).
