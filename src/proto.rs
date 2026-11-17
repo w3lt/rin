@@ -25,7 +25,8 @@ pub struct RunRequest {
     pub from_label: String,
     pub text: String,
     pub hops: u32,
-    /// What is left of the sender's timeout; the runtime kills the session after it.
+    /// What is left of this message's timeout (counted from when the hub got
+    /// it, queue time included); the runtime kills the session after it.
     pub timeout_ms: u64,
 }
 
