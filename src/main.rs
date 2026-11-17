@@ -16,5 +16,7 @@ mod proto;
 mod hub;
 #[cfg(any(feature = "hub", feature = "agent"))]
 mod signals;
+#[cfg(feature = "agent")]
+mod runtime;
 
 fn main() {}
