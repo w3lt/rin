@@ -147,14 +147,19 @@
     "resources": {
       "type": "object",
       "additionalProperties": false,
+      "required": [
+        "cpus",
+        "ram"
+      ],
       "properties": {
-        "cpu": {
-          "type": "string",
-          "description": "The CPU amount that will be allocated for this machine"
+        "cpus": {
+          "type": "number",
+          "description": "CPU limit for the agent's container, in cores (Compose cpus), e.g. 2 or 0.5"
         },
         "ram": {
           "type": "string",
-          "description": "The RAM amount that will be allocated for this machine"
+          "pattern": "^[1-9][0-9]*[mg]$",
+          "description": "Memory limit for the agent's container (Compose mem_limit), e.g. 512m or 4g"
         }
       }
     }
