@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use std::net::IpAddr;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Principal {
@@ -26,8 +26,10 @@ impl Principal {
 pub enum Resolver {
     /// Docker's DNS, asked on every request so restarted containers' new IPs are picked up.
     /// `seen` keeps every IP an agent or Bifrost has had, so a failed lookup
-    /// never lets your token in from a container.
-    Dns { seen: Mutex<HashSet<IpAddr>> },
+    /// never lets your token in from a container. `outside` remembers, briefly,
+    /// addresses just found to be none of them (yours), so `rin log -f` doesn't
+    /// look up every container every second.
+    Dns { seen: Mutex<HashSet<IpAddr>>, outside: Mutex<HashMap<IpAddr, Instant>> },
     /// Fixed addresses and runtime URLs, for tests.
     #[cfg_attr(not(test), allow(dead_code))]
     Static { ips: HashMap<String, IpAddr>, run_urls: HashMap<String, String> },
@@ -37,6 +39,9 @@ pub enum Resolver {
 /// upstream; don't let that hold up a request.
 const LOOKUP_TIMEOUT: Duration = Duration::from_secs(2);
 
+/// How long an address found to be no container's is trusted as such.
+const OUTSIDE_FOR: Duration = Duration::from_secs(10);
+
 async fn lookup(host: String) -> Option<IpAddr> {
     let addrs = tokio::time::timeout(LOOKUP_TIMEOUT, tokio::net::lookup_host((host.as_str(), 0))).await.ok()?.ok()?;
     addrs.map(|addr| addr.ip().to_canonical()).find(IpAddr::is_ipv4)
@@ -44,12 +49,12 @@ async fn lookup(host: String) -> Option<IpAddr> {
 
 impl Resolver {
     pub fn dns() -> Resolver {
-        Resolver::Dns { seen: Mutex::new(HashSet::new()) }
+        Resolver::Dns { seen: Mutex::new(HashSet::new()), outside: Mutex::new(HashMap::new()) }
     }
 
     pub async fn ip(&self, host: &str) -> Option<IpAddr> {
         match self {
-            Resolver::Dns { seen } => {
+            Resolver::Dns { seen, .. } => {
                 let ip = lookup(host.to_string()).await?;
                 seen.lock().unwrap_or_else(|e| e.into_inner()).insert(ip);
                 Some(ip)
@@ -61,10 +66,14 @@ impl Resolver {
     /// Whether `peer` is, or ever was, any of `hosts`; looked up concurrently.
     pub async fn is_any(&self, hosts: &[&str], peer: IpAddr) -> bool {
         match self {
-            Resolver::Dns { seen } => {
+            Resolver::Dns { seen, outside } => {
                 let known = |seen: &Mutex<HashSet<IpAddr>>| seen.lock().unwrap_or_else(|e| e.into_inner()).contains(&peer);
                 if known(seen) {
                     return true;
+                }
+                let fresh = |at: &Instant| at.elapsed() < OUTSIDE_FOR;
+                if outside.lock().unwrap_or_else(|e| e.into_inner()).get(&peer).is_some_and(fresh) {
+                    return false;
                 }
                 let mut lookups = tokio::task::JoinSet::new();
                 for host in hosts {
@@ -75,9 +84,22 @@ impl Resolver {
                         seen.lock().unwrap_or_else(|e| e.into_inner()).insert(ip);
                     }
                 }
-                known(seen)
+                let is_container = known(seen);
+                if !is_container {
+                    // Lookups run again once this is stale; see `seen` for why a stale "outside" is safe.
+                    self.note_outside(peer);
+                }
+                is_container
             }
             Resolver::Static { ips, .. } => hosts.iter().any(|h| ips.get(*h) == Some(&peer)),
+        }
+    }
+
+    fn note_outside(&self, peer: IpAddr) {
+        if let Resolver::Dns { outside, .. } = self {
+            let mut outside = outside.lock().unwrap_or_else(|e| e.into_inner());
+            outside.retain(|_, at| at.elapsed() < OUTSIDE_FOR);
+            outside.insert(peer, Instant::now());
         }
     }
 
@@ -169,5 +191,9 @@ mod tests {
         // The name no longer resolves (container stopped, DNS down): still not you.
         assert!(resolver.is_any(&["rin-test-gone.invalid"], localhost).await);
         assert!(!resolver.is_any(&["rin-test-gone.invalid"], ip("10.1.2.3")).await);
+        // Now remembered as outside for a while, with no lookups.
+        assert!(!resolver.is_any(&["rin-test-gone.invalid"], ip("10.1.2.3")).await);
+        // Containers' addresses are checked first: being remembered as outside never hides one.
+        assert!(resolver.is_any(&["rin-test-gone.invalid"], localhost).await);
     }
 }
