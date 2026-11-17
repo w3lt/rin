@@ -66,8 +66,10 @@ fn running_teams(except: &Team) -> Vec<String> {
 }
 
 pub fn up(team: &Team) -> Result<()> {
-    let already_up = states(team)?.get("hub").is_some_and(|s| s == "running");
-    if !already_up && std::net::TcpListener::bind(("127.0.0.1", team::HUB_PORT)).is_err() {
+    let states = states(team)?;
+    let hub_up = states.get("hub").is_some_and(|s| s == "running");
+    let any_up = states.values().any(|s| s == "running");
+    if !hub_up && std::net::TcpListener::bind(("127.0.0.1", team::HUB_PORT)).is_err() {
         bail!(
             "cannot start team {}: port {} on 127.0.0.1 is already in use{}. Only one Rin team can be up at a time: run `rin down --team <name>` first",
             team.name,
@@ -81,8 +83,8 @@ pub fn up(team: &Team) -> Result<()> {
     let mut command = compose(team);
     command.args(["up", "-d", "--build", "--remove-orphans"]);
     if let Err(e) = run(command) {
-        if !already_up {
-            // Leave nothing half-started behind.
+        if !any_up {
+            // Leave nothing half-started behind (but never stop what was already running).
             let mut down = compose(team);
             down.args(["down", "--remove-orphans"]);
             let _ = down.status();
