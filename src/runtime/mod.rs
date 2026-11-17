@@ -52,13 +52,11 @@ pub fn prompt(from: &str, from_label: &str, text: &str) -> String {
     format!("[Rin] Message from {from} ({from_label}).\nYour final answer will be sent back to them as the reply.\n\n{text}")
 }
 
+/// The host in `RIN_HUB_URL`, without IPv6 brackets.
 fn host_of(url: &str) -> String {
-    let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
-    let authority = rest.split('/').next().unwrap_or(rest);
-    match authority.rsplit_once(':') {
-        Some((host, port)) if port.chars().all(|c| c.is_ascii_digit()) => host.to_string(),
-        _ => authority.to_string(),
-    }
+    let parsed = reqwest::Url::parse(url).ok();
+    let host = parsed.as_ref().and_then(|u| u.host_str()).unwrap_or(url);
+    host.trim_start_matches('[').trim_end_matches(']').to_string()
 }
 
 impl Runtime {
@@ -186,7 +184,14 @@ impl Drop for KillOnDrop {
             let _ = killpg(Pid::from_raw(group as i32), Signal::SIGKILL);
         }
         #[cfg(target_os = "linux")]
-        kill_marked(&self.marker);
+        {
+            // Reading every /proc/*/environ blocks: keep it off the async workers.
+            let marker = std::mem::take(&mut self.marker);
+            match tokio::runtime::Handle::try_current() {
+                Ok(handle) => drop(handle.spawn_blocking(move || kill_marked(&marker))),
+                Err(_) => kill_marked(&marker),
+            }
+        }
     }
 }
 
@@ -292,6 +297,7 @@ mod tests {
         assert_eq!(host_of("http://hub:7000"), "hub");
         assert_eq!(host_of("http://127.0.0.1:1234/"), "127.0.0.1");
         assert_eq!(host_of("hub"), "hub");
+        assert_eq!(host_of("http://[fd00::2]:7000"), "fd00::2");
     }
 
     #[test]
