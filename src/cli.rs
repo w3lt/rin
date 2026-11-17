@@ -68,43 +68,40 @@ fn running_teams(except: &Team) -> Vec<String> {
 pub fn up(team: &Team) -> Result<()> {
     let already_up = states(team)?.get("hub").is_some_and(|s| s == "running");
     if !already_up && std::net::TcpListener::bind(("127.0.0.1", team::HUB_PORT)).is_err() {
-        bail!("{}", port_taken(team));
+        bail!(
+            "cannot start team {}: port {} on 127.0.0.1 is already in use{}. Only one Rin team can be up at a time: run `rin down --team <name>` first",
+            team.name,
+            team::HUB_PORT,
+            others_up(team)
+        );
     }
-    if let Err(e) = run({
-        let mut c = compose(team);
-        c.args(["up", "-d"]);
-        c
-    }) {
+    // --build: an agent that switched harness, or a new RIN_GIT_REV, needs a new
+    // image under the same tag; unchanged images come straight from the cache.
+    let mut command = compose(team);
+    command.args(["up", "-d", "--build"]);
+    if let Err(e) = run(command) {
         if !already_up {
             // Leave nothing half-started behind.
             let mut down = compose(team);
             down.arg("down");
             let _ = down.status();
         }
-        bail!("{e}\nteam {} is not up; {}", team.name, port_hint(team));
+        bail!(
+            "{e}\nteam {} is not up; if the error is about port {}, another Rin team or program is using it{}",
+            team.name,
+            team::HUB_PORT,
+            others_up(team)
+        );
     }
     Ok(())
 }
 
-fn port_taken(team: &Team) -> String {
-    let others = running_teams(team);
-    let by = match others.as_slice() {
+/// ` (team x is up)` when Docker runs other Rin teams.
+fn others_up(team: &Team) -> String {
+    match running_teams(team).as_slice() {
         [] => String::new(),
         names => format!(" (team {} is up)", names.join(", ")),
-    };
-    format!(
-        "cannot start team {}: port {} on 127.0.0.1 is already in use{by}. Only one Rin team can be up at a time: run `rin down --team <name>` first",
-        team.name,
-        team::HUB_PORT
-    )
-}
-
-fn port_hint(team: &Team) -> String {
-    format!("if the error is about port {}, another Rin team or program is using it", team::HUB_PORT)
-        + &match running_teams(team).as_slice() {
-            [] => String::new(),
-            names => format!(" (team {} is up)", names.join(", ")),
-        }
+    }
 }
 
 pub fn down(team: &Team) -> Result<()> {
