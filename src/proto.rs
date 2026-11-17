@@ -5,6 +5,9 @@
 use serde::{Deserialize, Serialize};
 
 /// `POST /messages` (sender → hub). Who is sending comes from the token, never the body.
+/// The most events one `GET /log` returns; ask again with `after` for more.
+pub const LOG_PAGE: usize = 500;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SendRequest {
     pub to: String,

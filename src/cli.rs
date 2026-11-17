@@ -167,15 +167,37 @@ pub async fn log(team: &Team, follow: bool, agent: Option<&str>) -> Result<()> {
     {
         bail!("unknown agent: {id:?}");
     }
-    let client = client(team)?;
+    let mut client = client(team)?;
     let mut after = 0;
+    let mut lost = false;
     loop {
-        for event in client.log(agent, after).await? {
-            print!("{}", display::event(&event));
-            after = event.id;
-        }
-        if !follow {
-            return Ok(());
+        match client.log(agent, after).await {
+            Ok(page) => {
+                if std::mem::take(&mut lost) {
+                    eprintln!("rin: following again");
+                }
+                let more = page.len() >= crate::proto::LOG_PAGE;
+                for event in page {
+                    print!("{}", display::event(&event));
+                    after = event.id;
+                }
+                if more {
+                    continue;
+                }
+                if !follow {
+                    return Ok(());
+                }
+            }
+            Err(e) if follow => {
+                if !std::mem::replace(&mut lost, true) {
+                    eprintln!("rin: {e:#} (still following)");
+                }
+                // The hub may come back with new tokens (`rin generate && rin up`).
+                if let Ok(fresh) = self::client(team) {
+                    client = fresh;
+                }
+            }
+            Err(e) => return Err(e),
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }

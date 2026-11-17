@@ -119,15 +119,16 @@ impl Db {
     }
 
     /// Events after `after`, optionally only those involving `agent`.
+    /// Up to [`crate::proto::LOG_PAGE`] events after `after`, oldest first.
     pub fn events(&self, agent: Option<&str>, after: i64) -> Result<Vec<Event>> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let mut stmt = conn.prepare(
             "SELECT id, ts, kind, msg, sender, receiver, hops, text FROM events
              WHERE id > ?1 AND (?2 IS NULL OR sender = ?2 OR receiver = ?2
                                 OR (',' || agents || ',') LIKE ('%,' || ?2 || ',%'))
-             ORDER BY id",
+             ORDER BY id LIMIT ?3",
         )?;
-        let rows = stmt.query_map(params![after, agent], |row| {
+        let rows = stmt.query_map(params![after, agent, crate::proto::LOG_PAGE as i64], |row| {
             Ok(Event {
                 id: row.get(0)?,
                 ts: row.get(1)?,
@@ -146,6 +147,19 @@ impl Db {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pages_the_log() {
+        let db = Db::memory();
+        let page = crate::proto::LOG_PAGE as i64;
+        for _ in 0..page + 1 {
+            db.message("user", "a", 1, "hi");
+        }
+        let first = db.events(None, 0).unwrap();
+        assert_eq!(first.len() as i64, page);
+        let rest = db.events(None, first.last().unwrap().id).unwrap();
+        assert_eq!(rest.len(), 1);
+    }
 
     #[test]
     fn filters_by_agent_and_cursor() {
