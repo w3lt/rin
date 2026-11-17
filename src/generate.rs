@@ -49,12 +49,14 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
         crate::files::set_mode(home, 0o700)?;
     }
     crate::files::set_mode(&home.join("teams"), 0o700)?;
+    let mut warnings = Vec::new();
     // Your provider keys: whoever made the file, only you may read it.
     let keys_env = home.join("keys.env");
-    if keys_env.is_file() {
-        crate::files::set_mode(&keys_env, 0o600)?;
+    if keys_env.is_file()
+        && let Err(e) = crate::files::set_mode(&keys_env, 0o600)
+    {
+        warnings.push(format!("{e:#}: make it readable by you only"));
     }
-    let mut warnings = Vec::new();
 
     let source = fs::canonicalize(file).unwrap_or_else(|_| file.to_path_buf());
     write_if_changed(&team.dir.join("source"), format!("{}\n", source.display()).as_bytes())?;
@@ -72,11 +74,14 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
         let names = PROVIDER_KEYS.map(|(var, _)| var).join(", ");
         if !keys_env.is_file() {
             warnings.push(format!(
-                "{} does not exist: create it with your provider keys ({names}) before `rin up`; only Bifrost reads it",
+                "{} does not exist: create it with your provider keys ({names}), then run `rin generate` again; only Bifrost reads it",
                 keys_env.display()
             ));
         } else if providers.is_empty() {
-            warnings.push(format!("{} sets none of {names}: API-key agents will have no provider", keys_env.display()));
+            warnings.push(format!(
+                "{} sets none of {names}: API-key agents will have no provider until you add one and run `rin generate` again",
+                keys_env.display()
+            ));
         }
         write_bifrost(&team, &config, &providers)?
     } else {
