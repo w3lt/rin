@@ -88,11 +88,20 @@ fn quote_key(key: &str) -> String {
         && key
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'));
-    if plain {
+    // An agent id may be `true` or `null`: as a plain key it would not be a string.
+    if plain && !is_keyword(key) {
         key.to_string()
     } else {
         json_quote(key)
     }
+}
+
+/// Words YAML reads as a boolean, null or float rather than a string.
+fn is_keyword(text: &str) -> bool {
+    matches!(
+        text.to_ascii_lowercase().as_str(),
+        "true" | "false" | "yes" | "no" | "on" | "off" | "y" | "n" | "null" | ".inf" | ".nan"
+    )
 }
 
 /// Plain style only for strings that can't be read as anything else
@@ -105,11 +114,7 @@ fn quote(text: &str) -> String {
     let chars_ok = text
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | '/' | ':' | '@' | '='));
-    let keyword = matches!(
-        text.to_ascii_lowercase().as_str(),
-        "true" | "false" | "yes" | "no" | "on" | "off" | "y" | "n" | "null" | ".inf" | ".nan"
-    );
-    if first_ok && chars_ok && !keyword && !text.ends_with(':') {
+    if first_ok && chars_ok && !is_keyword(text) && !text.ends_with(':') {
         text.to_string()
     } else {
         json_quote(text)
@@ -167,6 +172,12 @@ mod tests {
             doc.render(),
             "env_file:\n  - { path: ../../keys.env, required: false }\n  - ./b.env\n"
         );
+    }
+
+    #[test]
+    fn quotes_keys_that_are_not_strings() {
+        let doc = map([("null", s("a")), ("true", s("b")), ("backend", s("c"))]);
+        assert_eq!(doc.render(), "\"null\": a\n\"true\": b\nbackend: c\n");
     }
 
     #[test]
