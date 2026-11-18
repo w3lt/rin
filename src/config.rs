@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn rejects_reserved_and_malformed_ids() {
-        for id in ["hub", "user", "bifrost", "Backend", "1x", ""] {
+        for id in ["hub", "user", "bifrost", "localhost", "Backend", "1x", ""] {
             let e = err(&edit("id: backend", &format!("id: \"{id}\"")));
             assert!(e.contains("/agents/1/id"), "{id}: {e}");
         }

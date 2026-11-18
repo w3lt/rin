@@ -83,7 +83,8 @@
             "enum": [
               "user",
               "hub",
-              "bifrost"
+              "bifrost",
+              "localhost"
             ]
           }
         },
