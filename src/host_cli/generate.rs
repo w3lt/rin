@@ -10,7 +10,7 @@ use serde_json::json;
 use crate::compose;
 use crate::config::{self, Authentication, Config, VERSION};
 use crate::files::{random_hex, write_if_changed, write_private};
-use crate::team::{self, Team, Tokens, TokensExt};
+use crate::team::{self, Team, Tokens, read_tokens};
 
 pub const DOCKERFILE: &str = include_str!("../../images/Dockerfile");
 
@@ -212,7 +212,7 @@ fn check_names(home: &Path, config: &Config) -> Result<()> {
 
 /// Keeps existing tokens; makes new ones for new agents (or all, if `tokens.json` was deleted).
 fn tokens(team: &Team, config: &Config) -> Result<Tokens> {
-    let old = Tokens::read(&team.tokens_file())?.unwrap_or_default();
+    let old = read_tokens(&team.tokens_file())?.unwrap_or_default();
     let mut tokens = Tokens::new();
     for id in std::iter::once("user").chain(config.agents.iter().map(|a| a.id.as_str())) {
         let token = match old.get(id) {

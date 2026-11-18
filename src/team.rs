@@ -89,7 +89,7 @@ impl Team {
     }
 
     pub fn tokens(&self) -> Result<Tokens> {
-        Tokens::read(&self.tokens_file())?.ok_or_else(|| {
+        read_tokens(&self.tokens_file())?.ok_or_else(|| {
             anyhow!(
                 "{} is missing: run `rin generate`",
                 self.tokens_file().display()
@@ -101,18 +101,13 @@ impl Team {
 /// `tokens.json`: one token per agent id, plus `user` for you.
 pub type Tokens = BTreeMap<String, String>;
 
-pub trait TokensExt: Sized {
-    fn read(path: &Path) -> Result<Option<Self>>;
-}
-
-impl TokensExt for Tokens {
-    fn read(path: &Path) -> Result<Option<Tokens>> {
-        match fs::read_to_string(path) {
-            Ok(text) => serde_json::from_str(&text)
-                .map(Some)
-                .with_context(|| format!("{} is not a tokens file", path.display())),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(e) => Err(e).with_context(|| format!("cannot read {}", path.display())),
-        }
+/// Reads a `tokens.json`; `None` if there is none yet.
+pub fn read_tokens(path: &Path) -> Result<Option<Tokens>> {
+    match fs::read_to_string(path) {
+        Ok(text) => serde_json::from_str(&text)
+            .map(Some)
+            .with_context(|| format!("{} is not a tokens file", path.display())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e).with_context(|| format!("cannot read {}", path.display())),
     }
 }
