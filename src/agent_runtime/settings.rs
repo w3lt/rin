@@ -73,20 +73,22 @@ pub fn apply(home: &Path, settings: &Settings) -> Result<Vec<PathBuf>> {
                     s.insert("defaultProvider".into(), json!(provider));
                 }
             })?;
-            if let (Some(bifrost), Some(provider)) = (settings.bifrost, provider) {
-                let base_url = match provider {
-                    "anthropic" => Some(format!("{bifrost}/anthropic")),
-                    "openai" => Some(format!("{bifrost}/openai/v1")),
-                    "google" => Some(format!("{bifrost}/genai")),
+            if let Some(bifrost) = settings.bifrost {
+                let route = match provider {
+                    Some("anthropic") => Some(("anthropic", format!("{bifrost}/anthropic"))),
+                    Some("openai") => Some(("openai", format!("{bifrost}/openai/v1"))),
+                    Some("google") => Some(("google", format!("{bifrost}/genai"))),
                     _ => None,
                 };
-                match base_url {
-                    Some(url) => json(home.join(".pi/agent/models.json"), &|s| {
+                match route {
+                    Some((provider, url)) => json(home.join(".pi/agent/models.json"), &|s| {
                         object(object(s, "providers"), provider)
                             .insert("baseUrl".into(), json!(url));
                     })?,
+                    // Without a route pi would send its Bifrost key straight to the provider.
                     None => eprintln!(
-                        "rin runtime: pi provider {provider:?} can't be routed through Bifrost (use anthropic/, openai/ or google/)"
+                        "rin runtime: pi model {:?} can't be routed through Bifrost: write it as anthropic/<model>, openai/<model> or google/<model>",
+                        settings.model
                     ),
                 }
             }
