@@ -58,6 +58,20 @@ pub fn agents(response: &AgentsResponse) -> String {
     out
 }
 
+/// Prints `text` to stdout. When the reader has gone away (`rin log | head`)
+/// the command ends quietly, where `print!` would panic.
+pub fn out(text: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    let mut stdout = std::io::stdout().lock();
+    match stdout
+        .write_all(text.as_bytes())
+        .and_then(|()| stdout.flush())
+    {
+        Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => std::process::exit(0),
+        result => result,
+    }
+}
+
 /// Text an agent wrote, safe to show in your terminal: control characters
 /// (escape sequences, carriage returns, line breaks in a name) are written
 /// out as `\u{1b}`, so a message can't redraw the screen or fake a log line.

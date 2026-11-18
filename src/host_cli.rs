@@ -177,7 +177,7 @@ pub async fn status(team: &Team) -> Result<()> {
     let config = team.config()?;
     let states = states(team)?;
     let hub = client(team)?.agents().await;
-    println!("team {} (rin {})", team.name, config.version);
+    let mut text = format!("team {} (rin {})\n", team.name, config.version);
     let mut rows = vec![
         [
             "ID", "LABEL", "TYPE", "HARNESS", "STATE", "SESSIONS", "QUEUED",
@@ -212,15 +212,19 @@ pub async fn status(team: &Team) -> Result<()> {
             queued,
         ]);
     }
-    print!("{}", display::table(&rows));
+    text.push_str(&display::table(&rows));
     match &hub {
-        Ok(hub) => hub.warnings.iter().for_each(|w| println!("{w}")),
-        Err(e) => println!("hub: {e}"),
+        Ok(hub) => hub
+            .warnings
+            .iter()
+            .for_each(|w| text.push_str(&format!("{w}\n"))),
+        Err(e) => text.push_str(&format!("hub: {e}\n")),
     }
     if config.uses_api_keys() {
         let bifrost = states.get("bifrost").map_or("down", String::as_str);
-        println!("bifrost: {bifrost}");
+        text.push_str(&format!("bifrost: {bifrost}\n"));
     }
+    display::out(&text)?;
     Ok(())
 }
 
@@ -241,7 +245,7 @@ pub async fn log(team: &Team, follow: bool, agent: Option<&str>) -> Result<()> {
                 }
                 let more = page.len() >= crate::proto::LOG_PAGE;
                 for event in page {
-                    print!("{}", display::event(&event));
+                    display::out(&display::event(&event))?;
                     after = event.id;
                 }
                 if more {
