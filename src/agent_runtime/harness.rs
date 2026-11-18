@@ -76,8 +76,14 @@ pub fn answer(harness: Harness, stdout: &str, answer_file: Option<&str>) -> Resu
                     .or(errors)
                     .unwrap_or_else(|| result.to_string()));
             }
-            text.map(str::to_string)
-                .ok_or_else(|| format!("claude returned no result: {result}"))
+            match text {
+                // A last turn with no text: an empty reply tells the sender nothing.
+                Some(text) if text.trim().is_empty() => {
+                    Err("claude returned an empty answer".to_string())
+                }
+                Some(text) => Ok(text.to_string()),
+                None => Err(format!("claude returned no result: {result}")),
+            }
         }
         Harness::Codex => match answer_file.map(str::trim) {
             Some(text) if !text.is_empty() => Ok(text.to_string()),
@@ -107,6 +113,11 @@ mod tests {
         assert_eq!(
             answer(Harness::ClaudeCode, max, None),
             Err(r#"["max turns"]"#.into())
+        );
+        let empty = r#"{"type":"result","subtype":"success","is_error":false,"result":""}"#;
+        assert_eq!(
+            answer(Harness::ClaudeCode, empty, None),
+            Err("claude returned an empty answer".into())
         );
         assert!(answer(Harness::ClaudeCode, "garbage", None).is_err());
     }
