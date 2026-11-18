@@ -89,6 +89,7 @@ enum Cmd {
     Agents,
 }
 
+#[cfg(feature = "host")]
 #[derive(Subcommand)]
 enum HostCmd {
     /// Validate rin.yml and write the team's folder in $RIN_HOME; makes it the current team.
@@ -125,6 +126,7 @@ enum HostCmd {
     },
 }
 
+#[cfg(feature = "hub")]
 #[derive(Subcommand)]
 enum HubCmd {
     /// The hub server (hub container).
@@ -132,14 +134,13 @@ enum HubCmd {
     Hub,
 }
 
+#[cfg(feature = "agent")]
 #[derive(Subcommand)]
 enum AgentCmd {
     /// An agent container's main process.
-    #[cfg(feature = "agent")]
     #[command(hide = true)]
     Runtime,
     /// Rin's MCP server, started by the harness.
-    #[cfg(feature = "agent")]
     #[command(hide = true)]
     Mcp,
 }
