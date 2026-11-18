@@ -492,11 +492,7 @@ pub async fn main() -> Result<()> {
     let db_path = env_or("RIN_DB", "/var/lib/rin/hub.db");
     let listen = env_or("RIN_LISTEN", "0.0.0.0:7000");
 
-    let text = std::fs::read_to_string(&config_path)
-        .with_context(|| format!("cannot read {config_path}"))?;
-    let value =
-        serde_json::from_str(&text).with_context(|| format!("{config_path} is not JSON"))?;
-    let config = crate::config::from_value(value).with_context(|| config_path.clone())?;
+    let config = crate::config::from_json_file(std::path::Path::new(&config_path))?;
     let text = std::fs::read_to_string(&tokens_path)
         .with_context(|| format!("cannot read {tokens_path}"))?;
     let tokens: HashMap<String, String> = serde_json::from_str(&text)

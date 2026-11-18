@@ -85,11 +85,7 @@ impl Team {
     }
 
     pub fn config(&self) -> Result<Config> {
-        let text = fs::read_to_string(self.rin_json())
-            .with_context(|| format!("cannot read {}", self.rin_json().display()))?;
-        let value = serde_json::from_str(&text)
-            .with_context(|| format!("{} is not JSON", self.rin_json().display()))?;
-        crate::config::from_value(value).with_context(|| self.rin_json().display().to_string())
+        crate::config::from_json_file(&self.rin_json())
     }
 
     pub fn tokens(&self) -> Result<Tokens> {

@@ -213,6 +213,16 @@ pub fn from_yaml(text: &str) -> anyhow::Result<Config> {
     from_value(value)
 }
 
+/// Reads a generated `rin.json`.
+#[cfg(any(feature = "host", feature = "hub"))]
+pub fn from_json_file(path: &std::path::Path) -> anyhow::Result<Config> {
+    use anyhow::Context;
+    let shown = path.display();
+    let text = std::fs::read_to_string(path).with_context(|| format!("cannot read {shown}"))?;
+    let value = serde_json::from_str(&text).with_context(|| format!("{shown} is not JSON"))?;
+    from_value(value).with_context(|| shown.to_string())
+}
+
 /// Validates a config (from `rin.yml` or `rin.json`) and turns it into a [`Config`].
 #[cfg(any(feature = "host", feature = "hub"))]
 pub fn from_value(value: serde_json::Value) -> anyhow::Result<Config> {
