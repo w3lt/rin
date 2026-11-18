@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" role="img" aria-labelledby="title desc">
+  <title id="title">Rin</title>
+  <desc id="desc">Rin (Tohsaka): a team of AI agents, summoned on your own machine.</desc>
+
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1d0711"/>
+      <stop offset=".5" stop-color="#2c0a19"/>
+      <stop offset="1" stop-color="#0b0b1f"/>
+    </linearGradient>
+    <radialGradient id="halo" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#ff2d55" stop-opacity=".5"/>
+      <stop offset=".45" stop-color="#ff2d55" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#ff2d55" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffd6a0" stop-opacity=".7"/>
+      <stop offset=".5" stop-color="#ff4d6d" stop-opacity=".25"/>
+      <stop offset="1" stop-color="#ffd6a0" stop-opacity=".7"/>
+    </linearGradient>
+    <filter id="bloom" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+    <clipPath id="card">
+      <rect width="1280" height="420" rx="28"/>
+    </clipPath>
+    <path id="spark" d="M0,-12 Q1.6,-1.6 12,0 Q1.6,1.6 0,12 Q-1.6,1.6 -12,0 Q-1.6,-1.6 0,-12Z"/>
+  </defs>
+
+  <style>
+    .serif { font-family: Georgia, 'Times New Roman', 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif CJK JP', serif; }
+    .sans { font-family: -apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+    .ring { fill: none; stroke: #ff5c7a; }
+    .spin { transform-box: fill-box; transform-origin: center; animation: spin 90s linear infinite; }
+    .spin.back { animation-duration: 70s; animation-direction: reverse; }
+    .twinkle { animation: twinkle 4.5s ease-in-out infinite; }
+    .twinkle.b { animation-delay: -1.5s; }
+    .twinkle.c { animation-delay: -3s; }
+    .pulse { animation: pulse 5s ease-in-out infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes twinkle { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+    @keyframes pulse { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) {
+      .spin, .twinkle, .pulse { animation: none; }
+    }
+  </style>
+
+  <g clip-path="url(#card)">
+    <rect width="1280" height="420" fill="url(#night)"/>
+
+    <!-- stars -->
+    <g fill="#ffe9ee">
+      <g class="twinkle">
+        <circle cx="64" cy="58" r="1.4"/><circle cx="212" cy="36" r="1"/><circle cx="388" cy="74" r="1.6"/>
+        <circle cx="530" cy="40" r="1.1"/><circle cx="690" cy="92" r="1.3"/><circle cx="1196" cy="66" r="1.5"/>
+        <circle cx="150" cy="366" r="1.2"/><circle cx="472" cy="384" r="1"/><circle cx="1230" cy="330" r="1.3"/>
+      </g>
+      <g class="twinkle b">
+        <circle cx="120" cy="150" r="1"/><circle cx="300" cy="24" r="1.3"/><circle cx="610" cy="140" r="1"/>
+        <circle cx="760" cy="44" r="1.5"/><circle cx="1110" cy="24" r="1"/><circle cx="1250" cy="170" r="1.2"/>
+        <circle cx="330" cy="392" r="1.4"/><circle cx="640" cy="372" r="1.2"/><circle cx="1166" cy="392" r="1"/>
+      </g>
+      <g class="twinkle c">
+        <circle cx="36" cy="240" r="1.2"/><circle cx="456" cy="128" r="1"/><circle cx="700" cy="250" r="1.2"/>
+        <circle cx="742" cy="366" r="1.4"/><circle cx="1240" cy="250" r="1"/><circle cx="26" cy="396" r="1"/>
+        <circle cx="580" cy="300" r="1"/><circle cx="1150" cy="150" r="1.2"/><circle cx="246" cy="398" r="1"/>
+      </g>
+    </g>
+
+    <!-- magic circle -->
+    <g transform="translate(990 210)">
+      <circle r="250" fill="url(#halo)"/>
+
+      <g class="spin" opacity=".8">
+        <circle class="ring" r="176" stroke-width="1.5"/>
+        <circle class="ring" r="166" stroke-width="9" stroke-dasharray="1.5 15.89" opacity=".8"/>
+        <circle class="ring" r="156" stroke-width=".8"/>
+        <g fill="#ff8fa3">
+          <use href="#spark" transform="translate(0 -176) scale(.75)"/>
+          <use href="#spark" transform="translate(176 0) scale(.75)"/>
+          <use href="#spark" transform="translate(0 176) scale(.75)"/>
+          <use href="#spark" transform="translate(-176 0) scale(.75)"/>
+        </g>
+      </g>
+
+      <g class="spin back" opacity=".85">
+        <circle class="ring" r="132" stroke-width="1.2"/>
+        <polygon class="ring" stroke-width="1.2" points="0,-132 132,0 0,132 -132,0"/>
+        <polygon class="ring" stroke-width="1.2" points="93.3,-93.3 93.3,93.3 -93.3,93.3 -93.3,-93.3"/>
+        <circle class="ring" r="93.3" stroke-width=".8" stroke-dasharray="4 6"/>
+        <g fill="#2c0a19" stroke="#ff8fa3" stroke-width="1.2">
+          <circle cx="0" cy="-132" r="6"/><circle cx="93.3" cy="-93.3" r="6"/>
+          <circle cx="132" cy="0" r="6"/><circle cx="93.3" cy="93.3" r="6"/>
+          <circle cx="0" cy="132" r="6"/><circle cx="-93.3" cy="93.3" r="6"/>
+          <circle cx="-132" cy="0" r="6"/><circle cx="-93.3" cy="-93.3" r="6"/>
+        </g>
+      </g>
+
+      <!-- the jewel -->
+      <g class="pulse">
+        <polygon points="-30,-46 30,-46 54,-16 0,60 -54,-16" fill="#ff2d55" filter="url(#bloom)" opacity=".9"/>
+      </g>
+      <g stroke="#ffd0d8" stroke-width=".6" stroke-linejoin="round">
+        <polygon points="-30,-46 30,-46 18,-16 -18,-16" fill="#ff8fa3"/>
+        <polygon points="-30,-46 -54,-16 -18,-16" fill="#f0456a"/>
+        <polygon points="30,-46 54,-16 18,-16" fill="#d81e45"/>
+        <polygon points="-54,-16 -18,-16 0,60" fill="#c1121f"/>
+        <polygon points="-18,-16 18,-16 0,60" fill="#ef3358"/>
+        <polygon points="18,-16 54,-16 0,60" fill="#8f0d1f"/>
+      </g>
+      <polygon points="-24,-42 -4,-42 -12,-22 -19,-22" fill="#ffffff" opacity=".55"/>
+      <use href="#spark" class="twinkle" transform="translate(-38 -50)" fill="#ffffff"/>
+      <use href="#spark" class="twinkle b" transform="translate(40 26) scale(.5)" fill="#ffffff"/>
+    </g>
+
+    <!-- drifting sparkles -->
+    <g fill="#ff8fa3">
+      <use href="#spark" class="twinkle b" transform="translate(716 150) scale(.7)"/>
+      <use href="#spark" class="twinkle c" transform="translate(560 84) scale(.45)"/>
+      <use href="#spark" class="twinkle" transform="translate(70 318) scale(.5)"/>
+      <use href="#spark" class="twinkle c" transform="translate(1226 96) scale(.6)"/>
+    </g>
+
+    <!-- title -->
+    <text x="98" y="112" class="sans" font-size="17" font-weight="600" letter-spacing="9" fill="#ff8fa3">TOHSAKA</text>
+    <g class="serif" font-size="156" font-style="italic" fill="none" stroke="#ff2d55" stroke-linejoin="round">
+      <text x="90" y="252" stroke-width="22" opacity=".07">Rin</text>
+      <text x="90" y="252" stroke-width="13" opacity=".12">Rin</text>
+      <text x="90" y="252" stroke-width="6" opacity=".22">Rin</text>
+    </g>
+    <text x="90" y="252" class="serif" font-size="156" font-style="italic" fill="#fff4f6">Rin<tspan dx="34" dy="-10" font-size="92" font-style="normal" fill="#ff4d6d">凛</tspan></text>
+    <rect x="98" y="284" width="64" height="3" rx="1.5" fill="#ff4d6d"/>
+    <text x="98" y="328" class="sans" font-size="25" fill="#fbe4e8">A team of AI agents, summoned on your own machine.</text>
+    <text x="98" y="364" class="sans" font-size="15" font-weight="600" letter-spacing="4" fill="#b88792">ONE CONFIG  ·  ONE COMMAND  ·  ONE TEAM</text>
+  </g>
+
+  <!-- frame -->
+  <rect x="11" y="11" width="1258" height="398" rx="19" fill="none" stroke="url(#frame)" stroke-width="1.2"/>
+  <g fill="#ffd6a0" opacity=".8">
+    <path d="M32,26 l5,6 -5,6 -5,-6z"/><path d="M1248,26 l5,6 -5,6 -5,-6z"/>
+    <path d="M32,382 l5,6 -5,6 -5,-6z"/><path d="M1248,382 l5,6 -5,6 -5,-6z"/>
+  </g>
+</svg>
