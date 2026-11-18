@@ -10,12 +10,14 @@ cfg_select! {
 
         use std::path::PathBuf;
     }
+    _ => {}
 }
 
 cfg_select! {
     feature = "hub" => {
         mod hub;
     }
+    _ => {}
 }
 
 cfg_select! {
@@ -23,12 +25,14 @@ cfg_select! {
         mod mcp;
         mod agent_runtime;
     }
+    _ => {}
 }
 
 cfg_select! {
     any(feature = "hub", feature = "agent") => {
         mod signals;
     }
+    _ => {}
 }
 
 cfg_select! {

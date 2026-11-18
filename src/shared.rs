@@ -8,6 +8,7 @@ cfg_select! {
         use crate::team;
         use crate::host_cli;
     }
+    _ => {}
 }
 
 /// Inside an agent container `rin` speaks as that agent; on your machine, as you.
