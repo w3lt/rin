@@ -219,9 +219,13 @@ pub fn from_value(value: serde_json::Value) -> anyhow::Result<Config> {
     if value.get("rin").and_then(serde_json::Value::as_str) != Some("tohsaka") {
         anyhow::bail!(NOT_A_RIN_CONFIG);
     }
-    let schema: serde_json::Value = serde_json::from_str(SCHEMA).expect("embedded schema is JSON");
-    let validator = jsonschema::validator_for(&schema).expect("embedded schema is valid");
-    let problems: Vec<String> = validator
+    // Compiled once: `rin generate` reads every other team's config too.
+    static VALIDATOR: std::sync::LazyLock<jsonschema::Validator> = std::sync::LazyLock::new(|| {
+        let schema: serde_json::Value =
+            serde_json::from_str(SCHEMA).expect("embedded schema is JSON");
+        jsonschema::validator_for(&schema).expect("embedded schema is valid")
+    });
+    let problems: Vec<String> = VALIDATOR
         .iter_errors(&value)
         .map(|e| {
             let path = e.instance_path().to_string();
