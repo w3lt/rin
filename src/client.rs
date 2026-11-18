@@ -16,12 +16,22 @@ pub struct Client {
     http: reqwest::Client,
 }
 
+/// The HTTP client for Rin's own traffic (`rin` → hub, hub → runtimes). It never
+/// uses a proxy: `HTTP_PROXY` is there to reach the internet, and reqwest would
+/// otherwise hand it every message and token meant for 127.0.0.1 or a container.
+pub fn http() -> reqwest::Client {
+    reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .expect("a plain HTTP client can be built")
+}
+
 impl Client {
     pub fn new(url: impl Into<String>, token: impl Into<String>) -> Client {
         Client {
             url: url.into().trim_end_matches('/').to_string(),
             token: token.into(),
-            http: reqwest::Client::new(),
+            http: http(),
         }
     }
 

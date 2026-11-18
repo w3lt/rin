@@ -461,7 +461,7 @@ async fn too_long_messages_are_refused_before_sending() {
 async fn plain_text_errors_from_the_hub_are_shown() {
     // Errors raised before the hub's handlers (here: a bad query string) aren't JSON.
     let t = team("plain", Duration::from_secs(10)).await;
-    let response = reqwest::Client::new()
+    let response = crate::client::http()
         .get(format!("{}/log?after=abc", t.hub_url))
         .bearer_auth(&t.user_token)
         .send()
@@ -524,7 +524,7 @@ async fn runtime_rejects_anyone_but_the_hub() {
         &dir,
     );
     let addr = serve(crate::agent_runtime::router(Arc::new(runtime))).await;
-    let http = reqwest::Client::new();
+    let http = crate::client::http();
     let body = json!({ "from": "a", "fromLabel": "A", "text": "hi", "hops": 1, "timeoutMs": 1000 });
     for (token, why) in [("tok", "not from the hub"), ("wrong", "wrong token")] {
         let response = http

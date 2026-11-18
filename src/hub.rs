@@ -142,7 +142,7 @@ impl Hub {
             db,
             sched: Mutex::new(sched),
             next_id: AtomicU64::new(1),
-            http: reqwest::Client::new(),
+            http: crate::client::http(),
         }
     }
 
