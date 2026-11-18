@@ -9,13 +9,13 @@ use std::time::{Duration, Instant};
 
 use serde_json::json;
 
+use crate::agent_runtime::Runtime;
 use crate::client::Client;
 use crate::config::Harness;
 use crate::hub::auth::{Principal, Resolver};
 use crate::hub::db::Db;
 use crate::hub::{Hub, HubError};
 use crate::proto::{Kind, SendRequest};
-use crate::agent_runtime::Runtime;
 
 /// Answers `<first prompt line> | hops=<RIN_HOPS> | <message>`; `sleep N …` sleeps N seconds
 /// (in a child process, whose pid it records), `fail` exits 3, `bg` leaves a

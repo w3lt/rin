@@ -1,11 +1,14 @@
 //! Talking to the hub: `rin send`, `rin agents`, `rin log`, and `rin mcp`.
 
-#![cfg_attr(not(all(feature = "host", feature = "hub", feature = "agent")), allow(dead_code))]
+#![cfg_attr(
+    not(all(feature = "host", feature = "hub", feature = "agent")),
+    allow(dead_code)
+)]
 
 use anyhow::{Result, anyhow, bail};
 use serde::de::DeserializeOwned;
 
-use crate::proto::{AgentsResponse, Event, SendRequest, MAX_BODY};
+use crate::proto::{AgentsResponse, Event, MAX_BODY, SendRequest};
 
 pub struct Client {
     url: String,
@@ -15,7 +18,11 @@ pub struct Client {
 
 impl Client {
     pub fn new(url: impl Into<String>, token: impl Into<String>) -> Client {
-        Client { url: url.into().trim_end_matches('/').to_string(), token: token.into(), http: reqwest::Client::new() }
+        Client {
+            url: url.into().trim_end_matches('/').to_string(),
+            token: token.into(),
+            http: reqwest::Client::new(),
+        }
     }
 
     /// Inside an agent container: `RIN_TOKEN` and `RIN_HUB_URL`.
@@ -28,12 +35,20 @@ impl Client {
     /// Sends a message and waits for the reply (no client-side timeout:
     /// the hub enforces the team's timeout).
     pub async fn send(&self, to: &str, text: &str, hops: u32) -> Result<String> {
-        let request = SendRequest { to: to.to_string(), text: text.to_string(), hops };
+        let request = SendRequest {
+            to: to.to_string(),
+            text: text.to_string(),
+            hops,
+        };
         let body = serde_json::to_vec(&request)?;
         // The hub would cut a bigger upload short, which reads as "cannot reach the hub".
         if body.len() > MAX_BODY {
             let kib = |n: usize| format!("{} KiB", n.div_ceil(1024));
-            bail!("message too long: {} as JSON, the hub takes at most {}", kib(body.len()), kib(MAX_BODY));
+            bail!(
+                "message too long: {} as JSON, the hub takes at most {}",
+                kib(body.len()),
+                kib(MAX_BODY)
+            );
         }
         let response = self
             .http
@@ -51,7 +66,12 @@ impl Client {
     }
 
     pub async fn agents(&self) -> Result<AgentsResponse> {
-        let response = self.http.get(format!("{}/agents", self.url)).bearer_auth(&self.token).send().await;
+        let response = self
+            .http
+            .get(format!("{}/agents", self.url))
+            .bearer_auth(&self.token)
+            .send()
+            .await;
         self.read(response).await
     }
 
@@ -59,7 +79,11 @@ impl Client {
         let mut url = format!("{}/log?after={after}", self.url);
         if let Some(agent) = agent {
             // Ids are [a-z0-9-], so they need no escaping; anything else is no agent.
-            if agent.is_empty() || !agent.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+            if agent.is_empty()
+                || !agent
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+            {
                 bail!("unknown agent: {agent:?}");
             }
             url.push_str(&format!("&agent={agent}"));
@@ -72,10 +96,17 @@ impl Client {
         Ok(self.read::<Log>(response).await?.events)
     }
 
-    pub(crate) async fn read<T: DeserializeOwned>(&self, response: reqwest::Result<reqwest::Response>) -> Result<T> {
-        let response = response.map_err(|e| anyhow!("cannot reach the hub at {}: {}", self.url, root_cause(&e)))?;
+    pub(crate) async fn read<T: DeserializeOwned>(
+        &self,
+        response: reqwest::Result<reqwest::Response>,
+    ) -> Result<T> {
+        let response = response
+            .map_err(|e| anyhow!("cannot reach the hub at {}: {}", self.url, root_cause(&e)))?;
         let status = response.status();
-        let text = response.text().await.map_err(|e| anyhow!("bad answer from the hub ({status}): {e}"))?;
+        let text = response
+            .text()
+            .await
+            .map_err(|e| anyhow!("bad answer from the hub ({status}): {e}"))?;
         let body: serde_json::Value = match serde_json::from_str(&text) {
             Ok(body) => body,
             // Errors raised before the hub's handlers (body too large, ...) are plain text.
@@ -102,7 +133,9 @@ fn root_cause(e: &dyn std::error::Error) -> String {
 
 /// This session's hop count: `RIN_HOPS`, unset (0) for sessions you start yourself.
 pub fn current_hops() -> u32 {
-    env_var("RIN_HOPS").and_then(|h| h.trim().parse().ok()).unwrap_or(0)
+    env_var("RIN_HOPS")
+        .and_then(|h| h.trim().parse().ok())
+        .unwrap_or(0)
 }
 
 /// An environment variable, or else the nearest ancestor process's value.
@@ -131,7 +164,12 @@ pub fn env_var(name: &str) -> Option<String> {
 fn parent_of(pid: &str) -> Option<u32> {
     let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
     // pid (comm) state ppid …; comm may contain spaces and parentheses.
-    stat.rsplit_once(')')?.1.split_whitespace().nth(1)?.parse().ok()
+    stat.rsplit_once(')')?
+        .1
+        .split_whitespace()
+        .nth(1)?
+        .parse()
+        .ok()
 }
 
 #[cfg(target_os = "linux")]

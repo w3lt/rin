@@ -3,7 +3,10 @@
 //! The same type is written out as `rin.json` (defaults filled in) by `rin generate`
 //! and read back by the hub.
 
-#![cfg_attr(not(all(feature = "host", feature = "hub", feature = "agent")), allow(dead_code))]
+#![cfg_attr(
+    not(all(feature = "host", feature = "hub", feature = "agent")),
+    allow(dead_code)
+)]
 
 use std::time::Duration;
 
@@ -39,7 +42,10 @@ pub struct Messaging {
 
 impl Default for Messaging {
     fn default() -> Self {
-        Self { timeout: default_timeout(), max_hops: default_max_hops() }
+        Self {
+            timeout: default_timeout(),
+            max_hops: default_max_hops(),
+        }
     }
 }
 
@@ -111,8 +117,12 @@ impl AgentType {
 }
 
 impl Harness {
-    pub const ALL: [Harness; 4] =
-        [Harness::ClaudeCode, Harness::Codex, Harness::Antigravity, Harness::Pi];
+    pub const ALL: [Harness; 4] = [
+        Harness::ClaudeCode,
+        Harness::Codex,
+        Harness::Antigravity,
+        Harness::Pi,
+    ];
 
     pub fn as_str(self) -> &'static str {
         match self {
@@ -151,7 +161,9 @@ pub const MAX_MINUTES: u64 = 365 * 24 * 60;
 /// Parses `30m` style durations (whole minutes, as the schema allows), up to [`MAX_MINUTES`].
 pub fn parse_minutes(s: &str) -> Option<Duration> {
     let minutes: u64 = s.strip_suffix('m')?.parse().ok()?;
-    (1..=MAX_MINUTES).contains(&minutes).then(|| Duration::from_secs(minutes * 60))
+    (1..=MAX_MINUTES)
+        .contains(&minutes)
+        .then(|| Duration::from_secs(minutes * 60))
 }
 
 /// `45s`, `3m`, `1h20m`.
@@ -170,13 +182,18 @@ impl Config {
     }
 
     pub fn uses_api_keys(&self) -> bool {
-        self.agents.iter().any(|a| a.authentication == Authentication::ApiKey)
+        self.agents
+            .iter()
+            .any(|a| a.authentication == Authentication::ApiKey)
     }
 
     /// Checks JSON Schema can't express.
     fn check(&self) -> anyhow::Result<()> {
         if parse_minutes(&self.messaging.timeout).is_none() {
-            anyhow::bail!("messaging.timeout: {} is longer than {MAX_MINUTES}m (a year)", self.messaging.timeout);
+            anyhow::bail!(
+                "messaging.timeout: {} is longer than {MAX_MINUTES}m (a year)",
+                self.messaging.timeout
+            );
         }
         let mut seen = std::collections::HashSet::new();
         for agent in &self.agents {
@@ -208,7 +225,11 @@ pub fn from_value(value: serde_json::Value) -> anyhow::Result<Config> {
         .iter_errors(&value)
         .map(|e| {
             let path = e.instance_path().to_string();
-            let path = if path.is_empty() { "/".to_string() } else { path };
+            let path = if path.is_empty() {
+                "/".to_string()
+            } else {
+                path
+            };
             format!("  {path}: {e}")
         })
         .collect();
@@ -227,7 +248,10 @@ mod tests {
     const EXAMPLE: &str = include_str!("../examples/team/rin.yml");
 
     fn err(yaml: &str) -> String {
-        format!("{:#}", from_yaml(yaml).expect_err("config should be rejected"))
+        format!(
+            "{:#}",
+            from_yaml(yaml).expect_err("config should be rejected")
+        )
     }
 
     /// The example team with one line replaced.
@@ -240,7 +264,10 @@ mod tests {
     fn example_parses_with_defaults_filled() {
         let config = from_yaml(&edit("messaging:\n  timeout: 30m     # how long a sender waits for a reply\n  maxHops: 5       # longest chain of agent → agent messages\n", "")).unwrap();
         let json = serde_json::to_value(&config).unwrap();
-        assert_eq!(json["messaging"], serde_json::json!({"timeout": "30m", "maxHops": 5}));
+        assert_eq!(
+            json["messaging"],
+            serde_json::json!({"timeout": "30m", "maxHops": 5})
+        );
         assert_eq!(
             serde_json::to_string(&config.messaging).unwrap(),
             r#"{"timeout":"30m","maxHops":5}"#
@@ -280,7 +307,9 @@ mod tests {
 
     #[test]
     fn rejects_duplicate_ids() {
-        assert!(err(&edit("id: frontend", "id: backend")).contains("duplicate agent id: \"backend\""));
+        assert!(
+            err(&edit("id: frontend", "id: backend")).contains("duplicate agent id: \"backend\"")
+        );
     }
 
     #[test]
@@ -293,15 +322,36 @@ mod tests {
 
     #[test]
     fn pi_needs_an_api_key() {
-        let yaml = edit("harness: pi\n    authentication: apiKey", "harness: pi\n    authentication: subscription");
+        let yaml = edit(
+            "harness: pi\n    authentication: apiKey",
+            "harness: pi\n    authentication: subscription",
+        );
         assert!(err(&yaml).contains("/agents/1/authentication"));
     }
 
     #[test]
     fn rejects_bad_resources() {
-        assert!(err(&edit("cpus: 2, ram: 4g }\n\n  - id: backend", "cpus: 2, ram: 4GB }\n\n  - id: backend")).contains("/agents/0/resources/ram"));
-        assert!(err(&edit("cpus: 2, ram: 4g }\n\n  - id: backend", "cpus: 0, ram: 4g }\n\n  - id: backend")).contains("/agents/0/resources/cpus"));
-        assert!(err(&edit("cpus: 2, ram: 4g }\n\n  - id: backend", "ram: 4g }\n\n  - id: backend")).contains("/agents/0/resources"));
+        assert!(
+            err(&edit(
+                "cpus: 2, ram: 4g }\n\n  - id: backend",
+                "cpus: 2, ram: 4GB }\n\n  - id: backend"
+            ))
+            .contains("/agents/0/resources/ram")
+        );
+        assert!(
+            err(&edit(
+                "cpus: 2, ram: 4g }\n\n  - id: backend",
+                "cpus: 0, ram: 4g }\n\n  - id: backend"
+            ))
+            .contains("/agents/0/resources/cpus")
+        );
+        assert!(
+            err(&edit(
+                "cpus: 2, ram: 4g }\n\n  - id: backend",
+                "ram: 4g }\n\n  - id: backend"
+            ))
+            .contains("/agents/0/resources")
+        );
     }
 
     #[test]
@@ -322,7 +372,13 @@ mod tests {
         assert!(err(&edit("    model: gpt-5-codex\n", "")).contains("/agents/2"));
         assert!(err(&edit("rin: tohsaka", "rin: tohsaka\nfoo: 1")).contains("foo"));
         assert!(err(&edit("maxHops: 5", "maxHops: 5\n  foo: 1")).contains("foo"));
-        assert!(err(&edit("model: gpt-5-codex", "model: gpt-5-codex\n    foo: 1")).contains("foo"));
+        assert!(
+            err(&edit(
+                "model: gpt-5-codex",
+                "model: gpt-5-codex\n    foo: 1"
+            ))
+            .contains("foo")
+        );
         assert!(err(&edit("ram: 4g }", "ram: 4g, gpu: 1 }")).contains("gpu"));
     }
 
@@ -331,7 +387,10 @@ mod tests {
         assert_eq!(parse_minutes("1m"), Some(Duration::from_secs(60)));
         assert_eq!(parse_minutes("0m"), None);
         assert_eq!(parse_minutes("30s"), None);
-        assert_eq!(parse_minutes("525600m"), Some(Duration::from_secs(525_600 * 60)));
+        assert_eq!(
+            parse_minutes("525600m"),
+            Some(Duration::from_secs(525_600 * 60))
+        );
         assert_eq!(parse_minutes("525601m"), None);
         assert_eq!(parse_minutes("300000000000000000000m"), None);
     }
@@ -339,7 +398,10 @@ mod tests {
     #[test]
     fn rejects_absurd_timeouts() {
         let e = err(&edit("timeout: 30m", "timeout: 300000000000000000m"));
-        assert!(e.contains("messaging.timeout: 300000000000000000m is longer than 525600m"), "{e}");
+        assert!(
+            e.contains("messaging.timeout: 300000000000000000m is longer than 525600m"),
+            "{e}"
+        );
     }
 
     #[test]

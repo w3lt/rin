@@ -16,7 +16,15 @@ pub fn invocation(harness: Harness, model: &str, prompt: &str, answer_file: &Pat
     let (program, args) = match harness {
         Harness::ClaudeCode => (
             "claude",
-            vec![s("-p"), s(prompt), s("--output-format"), s("json"), s("--model"), s(model), s("--dangerously-skip-permissions")],
+            vec![
+                s("-p"),
+                s(prompt),
+                s("--output-format"),
+                s("json"),
+                s("--model"),
+                s(model),
+                s("--dangerously-skip-permissions"),
+            ],
         ),
         Harness::Codex => (
             "codex",
@@ -32,9 +40,16 @@ pub fn invocation(harness: Harness, model: &str, prompt: &str, answer_file: &Pat
             ],
         ),
         Harness::Pi => ("pi", vec![s("--model"), s(model), s("-p"), s(prompt)]),
-        Harness::Antigravity => {
-            ("agy", vec![s("-p"), s(prompt), s("--model"), s(model), s("--dangerously-skip-permissions")])
-        }
+        Harness::Antigravity => (
+            "agy",
+            vec![
+                s("-p"),
+                s(prompt),
+                s("--model"),
+                s(model),
+                s("--dangerously-skip-permissions"),
+            ],
+        ),
     };
     Invocation { program, args }
 }
@@ -50,11 +65,19 @@ pub fn answer(harness: Harness, stdout: &str, answer_file: Option<&str>) -> Resu
                 .find_map(|line| serde_json::from_str(line).ok())
                 .ok_or_else(|| "claude printed no JSON result".to_string())?;
             let text = result.get("result").and_then(serde_json::Value::as_str);
-            if result.get("is_error").and_then(serde_json::Value::as_bool).unwrap_or(false) {
+            if result
+                .get("is_error")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false)
+            {
                 let errors = result.get("errors").map(ToString::to_string);
-                return Err(text.map(str::to_string).or(errors).unwrap_or_else(|| result.to_string()));
+                return Err(text
+                    .map(str::to_string)
+                    .or(errors)
+                    .unwrap_or_else(|| result.to_string()));
             }
-            text.map(str::to_string).ok_or_else(|| format!("claude returned no result: {result}"))
+            text.map(str::to_string)
+                .ok_or_else(|| format!("claude returned no result: {result}"))
         }
         Harness::Codex => match answer_file.map(str::trim) {
             Some(text) if !text.is_empty() => Ok(text.to_string()),
@@ -73,15 +96,24 @@ mod tests {
         let ok = r#"{"type":"result","subtype":"success","is_error":false,"result":"pong","modelUsage":{}}"#;
         assert_eq!(answer(Harness::ClaudeCode, ok, None), Ok("pong".into()));
         let bad = r#"{"type":"result","subtype":"success","is_error":true,"result":"API Error: model not found"}"#;
-        assert_eq!(answer(Harness::ClaudeCode, bad, None), Err("API Error: model not found".into()));
+        assert_eq!(
+            answer(Harness::ClaudeCode, bad, None),
+            Err("API Error: model not found".into())
+        );
         let max = r#"{"type":"result","subtype":"error_max_turns","is_error":true,"errors":["max turns"]}"#;
-        assert_eq!(answer(Harness::ClaudeCode, max, None), Err(r#"["max turns"]"#.into()));
+        assert_eq!(
+            answer(Harness::ClaudeCode, max, None),
+            Err(r#"["max turns"]"#.into())
+        );
         assert!(answer(Harness::ClaudeCode, "garbage", None).is_err());
     }
 
     #[test]
     fn codex_reads_its_answer_file() {
-        assert_eq!(answer(Harness::Codex, "noise", Some("pong\n")), Ok("pong".into()));
+        assert_eq!(
+            answer(Harness::Codex, "noise", Some("pong\n")),
+            Ok("pong".into())
+        );
         assert!(answer(Harness::Codex, "", Some(" ")).is_err());
         assert!(answer(Harness::Codex, "", None).is_err());
     }
@@ -90,7 +122,11 @@ mod tests {
     fn every_run_gets_the_model() {
         for harness in Harness::ALL {
             let inv = invocation(harness, "m-1", "[Rin] hi", Path::new("/tmp/a"));
-            let at = inv.args.iter().position(|a| a == "--model").expect("--model");
+            let at = inv
+                .args
+                .iter()
+                .position(|a| a == "--model")
+                .expect("--model");
             assert_eq!(inv.args[at + 1], "m-1");
             assert!(inv.args.iter().any(|a| a == "[Rin] hi"));
         }

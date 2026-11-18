@@ -72,7 +72,10 @@ fn scalar(yaml: &Yaml) -> String {
         Yaml::Raw(text) => text.clone(),
         // A map in a list (`env_file: [{path, required}]`), as a flow mapping.
         Yaml::Map(entries) => {
-            let entries: Vec<String> = entries.iter().map(|(k, v)| format!("{}: {}", quote_key(k), scalar(v))).collect();
+            let entries: Vec<String> = entries
+                .iter()
+                .map(|(k, v)| format!("{}: {}", quote_key(k), scalar(v)))
+                .collect();
             format!("{{ {} }}", entries.join(", "))
         }
         // Lists in lists are not needed by the Compose file.
@@ -82,20 +85,35 @@ fn scalar(yaml: &Yaml) -> String {
 
 fn quote_key(key: &str) -> String {
     let plain = !key.is_empty()
-        && key.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'));
-    if plain { key.to_string() } else { json_quote(key) }
+        && key
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'));
+    if plain {
+        key.to_string()
+    } else {
+        json_quote(key)
+    }
 }
 
 /// Plain style only for strings that can't be read as anything else
 /// (numbers, booleans, null, `7000:7000` sexagesimals, comments, flow syntax).
 fn quote(text: &str) -> String {
-    let first_ok = text.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '/' || c == '.');
-    let chars_ok = text.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | '/' | ':' | '@' | '='));
+    let first_ok = text
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_ascii_alphabetic() || c == '/' || c == '.');
+    let chars_ok = text
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | '/' | ':' | '@' | '='));
     let keyword = matches!(
         text.to_ascii_lowercase().as_str(),
         "true" | "false" | "yes" | "no" | "on" | "off" | "y" | "n" | "null" | ".inf" | ".nan"
     );
-    if first_ok && chars_ok && !keyword && !text.ends_with(':') { text.to_string() } else { json_quote(text) }
+    if first_ok && chars_ok && !keyword && !text.ends_with(':') {
+        text.to_string()
+    } else {
+        json_quote(text)
+    }
 }
 
 fn json_quote(text: &str) -> String {
@@ -110,13 +128,22 @@ mod tests {
     fn renders_block_style() {
         let doc = map([
             ("name", s("rin-my-team")),
-            ("services", map([("hub", map([
-                ("ports", list([s("127.0.0.1:10302:7000")])),
-                ("init", Yaml::Raw("true".into())),
-                ("command", list([s("rin"), s("hub")])),
-                ("environment", map([("A", s("on")), ("B", s("4g")), ("C", s("http://hub:7000"))])),
-                ("empty", map(Vec::<(String, Yaml)>::new())),
-            ]))])),
+            (
+                "services",
+                map([(
+                    "hub",
+                    map([
+                        ("ports", list([s("127.0.0.1:10302:7000")])),
+                        ("init", Yaml::Raw("true".into())),
+                        ("command", list([s("rin"), s("hub")])),
+                        (
+                            "environment",
+                            map([("A", s("on")), ("B", s("4g")), ("C", s("http://hub:7000"))]),
+                        ),
+                        ("empty", map(Vec::<(String, Yaml)>::new())),
+                    ]),
+                )]),
+            ),
         ]);
         assert_eq!(
             doc.render(),
@@ -126,16 +153,48 @@ mod tests {
 
     #[test]
     fn renders_maps_in_lists_as_flow_mappings() {
-        let doc = map([("env_file", list([map([("path", s("../../keys.env")), ("required", Yaml::Raw("false".into()))]), s("./b.env")]))]);
-        assert_eq!(doc.render(), "env_file:\n  - { path: ../../keys.env, required: false }\n  - ./b.env\n");
+        let doc = map([(
+            "env_file",
+            list([
+                map([
+                    ("path", s("../../keys.env")),
+                    ("required", Yaml::Raw("false".into())),
+                ]),
+                s("./b.env"),
+            ]),
+        )]);
+        assert_eq!(
+            doc.render(),
+            "env_file:\n  - { path: ../../keys.env, required: false }\n  - ./b.env\n"
+        );
     }
 
     #[test]
     fn quotes_anything_ambiguous() {
-        for text in ["", "true", "No", "2", "0.5", "7000:7000", "a b", "#x", "x: y", "-x", "{a}", "a\"b", "ü"] {
+        for text in [
+            "",
+            "true",
+            "No",
+            "2",
+            "0.5",
+            "7000:7000",
+            "a b",
+            "#x",
+            "x: y",
+            "-x",
+            "{a}",
+            "a\"b",
+            "ü",
+        ] {
             assert!(quote(text).starts_with('"'), "{text:?} should be quoted");
         }
-        for text in ["rin", "/home/agent", "./env/rin.env", "maximhq/bifrost:v1.2.3", "http://hub:7000"] {
+        for text in [
+            "rin",
+            "/home/agent",
+            "./env/rin.env",
+            "maximhq/bifrost:v1.2.3",
+            "http://hub:7000",
+        ] {
             assert_eq!(quote(text), text);
         }
     }

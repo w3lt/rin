@@ -17,7 +17,8 @@ pub fn rin_home() -> Result<PathBuf> {
     if let Some(home) = std::env::var_os("RIN_HOME").filter(|h| !h.is_empty()) {
         return Ok(PathBuf::from(home));
     }
-    let home = std::env::var_os("HOME").ok_or_else(|| anyhow!("neither RIN_HOME nor HOME is set"))?;
+    let home =
+        std::env::var_os("HOME").ok_or_else(|| anyhow!("neither RIN_HOME nor HOME is set"))?;
     Ok(PathBuf::from(home).join(".rin"))
 }
 
@@ -38,7 +39,10 @@ pub struct Team {
 
 impl Team {
     pub fn at(home: &Path, name: &str) -> Team {
-        Team { name: name.to_string(), dir: home.join("teams").join(name) }
+        Team {
+            name: name.to_string(),
+            dir: home.join("teams").join(name),
+        }
     }
 
     /// The team named by `--team`, or else the current team.
@@ -56,7 +60,10 @@ impl Team {
         };
         let team = Team::at(&home, &name);
         if !team.rin_json().is_file() {
-            bail!("unknown team {name:?}: no {} (run `rin generate`)", team.rin_json().display());
+            bail!(
+                "unknown team {name:?}: no {} (run `rin generate`)",
+                team.rin_json().display()
+            );
         }
         Ok(team)
     }
@@ -86,8 +93,12 @@ impl Team {
     }
 
     pub fn tokens(&self) -> Result<Tokens> {
-        Tokens::read(&self.tokens_file())?
-            .ok_or_else(|| anyhow!("{} is missing: run `rin generate`", self.tokens_file().display()))
+        Tokens::read(&self.tokens_file())?.ok_or_else(|| {
+            anyhow!(
+                "{} is missing: run `rin generate`",
+                self.tokens_file().display()
+            )
+        })
     }
 }
 

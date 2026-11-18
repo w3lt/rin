@@ -35,8 +35,12 @@ pub fn agent_environment(config: &Config, agent: &Agent) -> Vec<(&'static str, S
     if agent.authentication == Authentication::ApiKey {
         env.push(("RIN_BIFROST_URL", BIFROST_URL.to_string()));
         match agent.harness {
-            Harness::ClaudeCode => env.push(("ANTHROPIC_BASE_URL", format!("{BIFROST_URL}/anthropic"))),
-            Harness::Antigravity => env.push(("GOOGLE_GEMINI_BASE_URL", format!("{BIFROST_URL}/genai"))),
+            Harness::ClaudeCode => {
+                env.push(("ANTHROPIC_BASE_URL", format!("{BIFROST_URL}/anthropic")))
+            }
+            Harness::Antigravity => {
+                env.push(("GOOGLE_GEMINI_BASE_URL", format!("{BIFROST_URL}/genai")))
+            }
             // Codex and pi read their gateway from config files `rin runtime` writes.
             Harness::Codex | Harness::Pi => {}
         }
@@ -64,9 +68,17 @@ pub fn docker_names(config: &Config) -> Vec<(&'static str, String)> {
     if config.uses_api_keys() {
         services.push("bifrost".to_string());
     }
-    let mut names: Vec<_> = services.iter().map(|svc| ("container", volume_name(config, svc))).collect();
+    let mut names: Vec<_> = services
+        .iter()
+        .map(|svc| ("container", volume_name(config, svc)))
+        .collect();
     names.push(("volume", volume_name(config, "hub")));
-    names.extend(config.agents.iter().map(|a| ("volume", volume_name(config, &format!("{}-home", a.id)))));
+    names.extend(
+        config
+            .agents
+            .iter()
+            .map(|a| ("volume", volume_name(config, &format!("{}-home", a.id)))),
+    );
     if config.uses_api_keys() {
         names.push(("volume", volume_name(config, "bifrost")));
     }
@@ -84,16 +96,22 @@ pub fn render(inputs: &Inputs) -> String {
             ("hostname", s("hub")),
             ("init", Yaml::Raw("true".into())),
             ("labels", map([("rin.files", s(inputs.hub_files_hash))])),
-            ("environment", map([
-                ("RIN_CONFIG", s("/etc/rin/rin.json")),
-                ("RIN_TOKENS", s("/etc/rin/tokens.json")),
-                ("RIN_DB", s("/var/lib/rin/hub.db")),
-            ])),
-            ("volumes", list([
-                s(format!("{}:/var/lib/rin", volume_name(config, "hub"))),
-                s("./rin.json:/etc/rin/rin.json:ro"),
-                s("./tokens.json:/etc/rin/tokens.json:ro"),
-            ])),
+            (
+                "environment",
+                map([
+                    ("RIN_CONFIG", s("/etc/rin/rin.json")),
+                    ("RIN_TOKENS", s("/etc/rin/tokens.json")),
+                    ("RIN_DB", s("/var/lib/rin/hub.db")),
+                ]),
+            ),
+            (
+                "volumes",
+                list([
+                    s(format!("{}:/var/lib/rin", volume_name(config, "hub"))),
+                    s("./rin.json:/etc/rin/rin.json:ro"),
+                    s("./tokens.json:/etc/rin/tokens.json:ro"),
+                ]),
+            ),
             ("ports", list([s("127.0.0.1:10302:7000")])),
         ]),
     )];
@@ -101,25 +119,33 @@ pub fn render(inputs: &Inputs) -> String {
 
     for agent in &config.agents {
         let home = volume_name(config, &format!("{}-home", agent.id));
-        let environment = agent_environment(config, agent).into_iter().map(|(k, v)| (k, s(v)));
+        let environment = agent_environment(config, agent)
+            .into_iter()
+            .map(|(k, v)| (k, s(v)));
         services.push((
             agent.id.clone(),
             map([
                 ("build", build(agent.harness.as_str(), inputs)),
-                ("image", s(format!("rin-{}-{}:{version}", config.name, agent.id))),
+                (
+                    "image",
+                    s(format!("rin-{}-{}:{version}", config.name, agent.id)),
+                ),
                 ("hostname", s(agent.id.clone())),
                 ("init", Yaml::Raw("true".into())),
                 ("working_dir", s("/home/agent/work")),
                 ("env_file", list([s(format!("./env/{}.env", agent.id))])),
                 ("environment", map(environment)),
-                ("volumes", list([
-                    s(format!("{home}:/home/agent")),
-                    s(format!(
-                        "./instructions/{}/INSTRUCTIONS.md:{}:ro",
-                        agent.id,
-                        agent.harness.instructions_path()
-                    )),
-                ])),
+                (
+                    "volumes",
+                    list([
+                        s(format!("{home}:/home/agent")),
+                        s(format!(
+                            "./instructions/{}/INSTRUCTIONS.md:{}:ro",
+                            agent.id,
+                            agent.harness.instructions_path()
+                        )),
+                    ]),
+                ),
                 ("cpus", Yaml::Raw(agent.resources.cpus.to_string())),
                 ("mem_limit", s(agent.resources.ram.clone())),
             ]),
@@ -134,14 +160,23 @@ pub fn render(inputs: &Inputs) -> String {
                 ("image", s(BIFROST_IMAGE)),
                 ("hostname", s("bifrost")),
                 // Optional: a missing keys.env must not stop Compose (and `rin down`) from loading the project.
-                ("env_file", list([
-                    map([("path", s("../../keys.env")), ("required", Yaml::Raw("false".into()))]),
-                    s("./bifrost/bifrost.env"),
-                ])),
-                ("volumes", list([
-                    s(format!("{}:/app/data", volume_name(config, "bifrost"))),
-                    s("./bifrost/config.json:/app/data/config.json:ro"),
-                ])),
+                (
+                    "env_file",
+                    list([
+                        map([
+                            ("path", s("../../keys.env")),
+                            ("required", Yaml::Raw("false".into())),
+                        ]),
+                        s("./bifrost/bifrost.env"),
+                    ]),
+                ),
+                (
+                    "volumes",
+                    list([
+                        s(format!("{}:/app/data", volume_name(config, "bifrost"))),
+                        s("./bifrost/config.json:/app/data/config.json:ro"),
+                    ]),
+                ),
             ]),
         ));
         volumes.push(volume_name(config, "bifrost"));
@@ -150,7 +185,15 @@ pub fn render(inputs: &Inputs) -> String {
     let doc = map([
         ("name", s(format!("rin-{}", config.name))),
         ("services", Yaml::Map(services)),
-        ("volumes", map(volumes.into_iter().map(|v| (v.clone(), map([("name", s(v))]))))),
+        (
+            "volumes",
+            map(volumes
+                .into_iter()
+                .map(|v| (v.clone(), map([("name", s(v))])))),
+        ),
     ]);
-    format!("# Written by `rin generate`: change rin.yml and run it again rather than editing this file.\n{}", doc.render())
+    format!(
+        "# Written by `rin generate`: change rin.yml and run it again rather than editing this file.\n{}",
+        doc.render()
+    )
 }

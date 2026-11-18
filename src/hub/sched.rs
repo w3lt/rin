@@ -64,9 +64,21 @@ impl Sched {
     pub fn new<'a>(agents: impl IntoIterator<Item = (&'a str, usize)>) -> Sched {
         let agents = agents
             .into_iter()
-            .map(|(id, max)| (id.to_string(), Slots { max: max.max(1), running: 0, queue: VecDeque::new() }))
+            .map(|(id, max)| {
+                (
+                    id.to_string(),
+                    Slots {
+                        max: max.max(1),
+                        running: 0,
+                        queue: VecDeque::new(),
+                    },
+                )
+            })
             .collect();
-        Sched { agents, ..Sched::default() }
+        Sched {
+            agents,
+            ..Sched::default()
+        }
     }
 
     /// Takes a slot on `to` for message `id`, or queues it.
@@ -80,15 +92,27 @@ impl Sched {
             slots.queue.push_back((id, tx));
             (State::Queued(now), Admit::Queued(rx))
         };
-        self.inflight.insert(id, Inflight { from: from.to_string(), to: to.to_string(), state });
+        self.inflight.insert(
+            id,
+            Inflight {
+                from: from.to_string(),
+                to: to.to_string(),
+                state,
+            },
+        );
         admit
     }
 
     /// Message `id` is done (answered, failed, timed out or abandoned): frees
     /// its slot for the next queued message, or takes it out of the queue.
     pub fn finish(&mut self, id: MsgId) {
-        let Some(msg) = self.inflight.remove(&id) else { return };
-        let slots = self.agents.get_mut(&msg.to).expect("receiver is a known agent");
+        let Some(msg) = self.inflight.remove(&id) else {
+            return;
+        };
+        let slots = self
+            .agents
+            .get_mut(&msg.to)
+            .expect("receiver is a known agent");
         match msg.state {
             State::Queued(_) => slots.queue.retain(|(queued, _)| *queued != id),
             State::Running => loop {
@@ -107,11 +131,18 @@ impl Sched {
     }
 
     pub fn usage(&self, agent: &str) -> Usage {
-        self.agents.get(agent).map_or(Usage { running: 0, max: 0, queued: 0 }, |s| Usage {
-            running: s.running,
-            max: s.max,
-            queued: s.queue.len(),
-        })
+        self.agents.get(agent).map_or(
+            Usage {
+                running: 0,
+                max: 0,
+                queued: 0,
+            },
+            |s| Usage {
+                running: s.running,
+                max: s.max,
+                queued: s.queue.len(),
+            },
+        )
     }
 
     /// Suspected deadlocks: cycles in the wait graph (A → B while A has a
@@ -122,7 +153,10 @@ impl Sched {
         let mut edges: HashMap<&str, BTreeSet<&str>> = HashMap::new();
         for msg in self.inflight.values() {
             if full(&msg.from) && full(&msg.to) {
-                edges.entry(msg.from.as_str()).or_default().insert(msg.to.as_str());
+                edges
+                    .entry(msg.from.as_str())
+                    .or_default()
+                    .insert(msg.to.as_str());
             }
         }
         let reach = |start: &str| -> HashSet<String> {
@@ -137,13 +171,18 @@ impl Sched {
             }
             seen
         };
-        let reaches: HashMap<&str, HashSet<String>> = edges.keys().map(|&n| (n, reach(n))).collect();
+        let reaches: HashMap<&str, HashSet<String>> =
+            edges.keys().map(|&n| (n, reach(n))).collect();
 
         let mut components: BTreeSet<Vec<String>> = BTreeSet::new();
         for (&node, reached) in &reaches {
             let mut component: Vec<String> = reached
                 .iter()
-                .filter(|other| reaches.get(other.as_str()).is_some_and(|back| back.contains(node)))
+                .filter(|other| {
+                    reaches
+                        .get(other.as_str())
+                        .is_some_and(|back| back.contains(node))
+                })
                 .cloned()
                 .collect();
             if !component.iter().any(|c| c == node) {
@@ -183,7 +222,11 @@ impl Sched {
     /// Cycles that broke are forgotten, so they're reported again if they come back.
     pub fn new_deadlocks(&mut self, now: Instant) -> Vec<Deadlock> {
         let current = self.deadlocks(now);
-        let fresh = current.iter().filter(|d| !self.reported.contains(&d.agents)).cloned().collect();
+        let fresh = current
+            .iter()
+            .filter(|d| !self.reported.contains(&d.agents))
+            .cloned()
+            .collect();
         self.reported = current.into_iter().map(|d| d.agents).collect();
         fresh
     }
@@ -197,8 +240,16 @@ impl fmt::Display for Deadlock {
             self.agents.join(", ")
         };
         let first = self.usage[0];
-        let usage = if self.usage.iter().all(|u| u.running == first.running && u.max == first.max) {
-            let all = if self.agents.len() == 2 { "both" } else { "all" };
+        let usage = if self
+            .usage
+            .iter()
+            .all(|u| u.running == first.running && u.max == first.max)
+        {
+            let all = if self.agents.len() == 2 {
+                "both"
+            } else {
+                "all"
+            };
             format!("{all} {}/{}", first.running, first.max)
         } else {
             self.agents
@@ -208,7 +259,12 @@ impl fmt::Display for Deadlock {
                 .collect::<Vec<_>>()
                 .join(", ")
         };
-        write!(f, "⚠ possible deadlock: {names} ({usage}, {} queued for {})", self.queued, crate::config::format_duration(self.since))
+        write!(
+            f,
+            "⚠ possible deadlock: {names} ({usage}, {} queued for {})",
+            self.queued,
+            crate::config::format_duration(self.since)
+        )
     }
 }
 
@@ -224,20 +280,48 @@ mod tests {
     fn queues_first_come_first_served() {
         let mut s = sched();
         let now = Instant::now();
-        assert!(matches!(s.admit(1, "user", "frontend", now), Admit::Running));
-        let Admit::Queued(mut second) = s.admit(2, "user", "frontend", now) else { panic!() };
-        let Admit::Queued(mut third) = s.admit(3, "user", "frontend", now) else { panic!() };
-        assert_eq!(s.usage("frontend"), Usage { running: 1, max: 1, queued: 2 });
+        assert!(matches!(
+            s.admit(1, "user", "frontend", now),
+            Admit::Running
+        ));
+        let Admit::Queued(mut second) = s.admit(2, "user", "frontend", now) else {
+            panic!()
+        };
+        let Admit::Queued(mut third) = s.admit(3, "user", "frontend", now) else {
+            panic!()
+        };
+        assert_eq!(
+            s.usage("frontend"),
+            Usage {
+                running: 1,
+                max: 1,
+                queued: 2
+            }
+        );
 
         s.finish(1);
         assert!(second.try_recv().is_ok());
         assert!(third.try_recv().is_err());
-        assert_eq!(s.usage("frontend"), Usage { running: 1, max: 1, queued: 1 });
+        assert_eq!(
+            s.usage("frontend"),
+            Usage {
+                running: 1,
+                max: 1,
+                queued: 1
+            }
+        );
 
         s.finish(2);
         assert!(third.try_recv().is_ok());
         s.finish(3);
-        assert_eq!(s.usage("frontend"), Usage { running: 0, max: 1, queued: 0 });
+        assert_eq!(
+            s.usage("frontend"),
+            Usage {
+                running: 0,
+                max: 1,
+                queued: 0
+            }
+        );
     }
 
     #[test]
@@ -245,8 +329,12 @@ mod tests {
         let mut s = sched();
         let now = Instant::now();
         s.admit(1, "user", "frontend", now);
-        let Admit::Queued(gone) = s.admit(2, "user", "frontend", now) else { panic!() };
-        let Admit::Queued(mut waiting) = s.admit(3, "user", "frontend", now) else { panic!() };
+        let Admit::Queued(gone) = s.admit(2, "user", "frontend", now) else {
+            panic!()
+        };
+        let Admit::Queued(mut waiting) = s.admit(3, "user", "frontend", now) else {
+            panic!()
+        };
 
         // 2 times out while queued: it leaves the queue without ever running.
         s.finish(2);
@@ -256,10 +344,19 @@ mod tests {
         assert!(waiting.try_recv().is_ok());
 
         // A waiter that gave up after the slot was handed over still gives it back.
-        let Admit::Queued(_late) = s.admit(4, "user", "frontend", now) else { panic!() };
+        let Admit::Queued(_late) = s.admit(4, "user", "frontend", now) else {
+            panic!()
+        };
         s.finish(3);
         s.finish(4);
-        assert_eq!(s.usage("frontend"), Usage { running: 0, max: 1, queued: 0 });
+        assert_eq!(
+            s.usage("frontend"),
+            Usage {
+                running: 0,
+                max: 1,
+                queued: 0
+            }
+        );
     }
 
     #[test]
@@ -267,10 +364,19 @@ mod tests {
         let mut s = sched();
         let now = Instant::now();
         s.admit(1, "user", "frontend", now);
-        let Admit::Queued(dropped) = s.admit(2, "user", "frontend", now) else { panic!() };
+        let Admit::Queued(dropped) = s.admit(2, "user", "frontend", now) else {
+            panic!()
+        };
         drop(dropped);
         s.finish(1);
-        assert_eq!(s.usage("frontend"), Usage { running: 0, max: 1, queued: 0 });
+        assert_eq!(
+            s.usage("frontend"),
+            Usage {
+                running: 0,
+                max: 1,
+                queued: 0
+            }
+        );
     }
 
     #[test]
@@ -286,10 +392,15 @@ mod tests {
 
         let found = s.new_deadlocks(t0 + Duration::from_secs(5));
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].to_string(), "⚠ possible deadlock: backend ⇄ frontend (both 1/1, 2 queued for 5s)");
+        assert_eq!(
+            found[0].to_string(),
+            "⚠ possible deadlock: backend ⇄ frontend (both 1/1, 2 queued for 5s)"
+        );
         assert!(s.new_deadlocks(t0).is_empty(), "reported once");
-        assert_eq!(s.deadlocks(t0 + Duration::from_secs(180))[0].to_string(),
-            "⚠ possible deadlock: backend ⇄ frontend (both 1/1, 2 queued for 3m)");
+        assert_eq!(
+            s.deadlocks(t0 + Duration::from_secs(180))[0].to_string(),
+            "⚠ possible deadlock: backend ⇄ frontend (both 1/1, 2 queued for 3m)"
+        );
 
         // The timeout breaks it.
         s.finish(3);
@@ -319,6 +430,9 @@ mod tests {
         s.admit(5, "c", "a", t0);
         let found = s.deadlocks(t0);
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].to_string(), "⚠ possible deadlock: a, b, c (a 1/1, b 1/1, c 2/2, 1 queued for 0s)");
+        assert_eq!(
+            found[0].to_string(),
+            "⚠ possible deadlock: a, b, c (a 1/1, b 1/1, c 2/2, 1 queued for 0s)"
+        );
     }
 }

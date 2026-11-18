@@ -2,8 +2,8 @@
 //! checks the request comes from that agent's own container.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::Mutex;
 use std::net::IpAddr;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,10 +30,16 @@ pub enum Resolver {
     /// token in from a container the hub has seen. `outside` remembers, briefly,
     /// addresses just found to be none of them (yours), so `rin log -f` doesn't
     /// look up every container every second.
-    Dns { seen: Mutex<HashSet<IpAddr>>, outside: Mutex<HashMap<IpAddr, Instant>> },
+    Dns {
+        seen: Mutex<HashSet<IpAddr>>,
+        outside: Mutex<HashMap<IpAddr, Instant>>,
+    },
     /// Fixed addresses and runtime URLs, for tests.
     #[cfg_attr(not(test), allow(dead_code))]
-    Static { ips: HashMap<String, IpAddr>, run_urls: HashMap<String, String> },
+    Static {
+        ips: HashMap<String, IpAddr>,
+        run_urls: HashMap<String, String>,
+    },
 }
 
 /// A stopped container's name is unknown to Docker's DNS, which may ask
@@ -45,13 +51,21 @@ const OUTSIDE_FOR: Duration = Duration::from_secs(10);
 
 /// The container's IPv4 address; `None` if the name doesn't resolve in time.
 async fn lookup(host: String) -> Option<IpAddr> {
-    let addrs = tokio::time::timeout(LOOKUP_TIMEOUT, tokio::net::lookup_host((host.as_str(), 0))).await.ok()?.ok()?;
-    addrs.map(|addr| addr.ip().to_canonical()).find(IpAddr::is_ipv4)
+    let addrs = tokio::time::timeout(LOOKUP_TIMEOUT, tokio::net::lookup_host((host.as_str(), 0)))
+        .await
+        .ok()?
+        .ok()?;
+    addrs
+        .map(|addr| addr.ip().to_canonical())
+        .find(IpAddr::is_ipv4)
 }
 
 impl Resolver {
     pub fn dns() -> Resolver {
-        Resolver::Dns { seen: Mutex::new(HashSet::new()), outside: Mutex::new(HashMap::new()) }
+        Resolver::Dns {
+            seen: Mutex::new(HashSet::new()),
+            outside: Mutex::new(HashMap::new()),
+        }
     }
 
     pub async fn ip(&self, host: &str) -> Option<IpAddr> {
@@ -69,12 +83,21 @@ impl Resolver {
     pub async fn is_any(&self, hosts: &[&str], peer: IpAddr) -> bool {
         match self {
             Resolver::Dns { seen, outside } => {
-                let known = |seen: &Mutex<HashSet<IpAddr>>| seen.lock().unwrap_or_else(|e| e.into_inner()).contains(&peer);
+                let known = |seen: &Mutex<HashSet<IpAddr>>| {
+                    seen.lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .contains(&peer)
+                };
                 if known(seen) {
                     return true;
                 }
                 let fresh = |at: &Instant| at.elapsed() < OUTSIDE_FOR;
-                if outside.lock().unwrap_or_else(|e| e.into_inner()).get(&peer).is_some_and(fresh) {
+                if outside
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .get(&peer)
+                    .is_some_and(fresh)
+                {
                     return false;
                 }
                 self.refresh(hosts).await;
@@ -92,7 +115,9 @@ impl Resolver {
 
     /// Looks up `hosts` concurrently and remembers every address found.
     pub async fn refresh(&self, hosts: &[&str]) {
-        let Resolver::Dns { seen, .. } = self else { return };
+        let Resolver::Dns { seen, .. } = self else {
+            return;
+        };
         let mut lookups = tokio::task::JoinSet::new();
         for host in hosts {
             lookups.spawn(lookup(host.to_string()));
@@ -154,10 +179,14 @@ mod tests {
     #[tokio::test]
     async fn token_and_ip_must_match() {
         let resolver = Resolver::Static {
-            ips: [("rin", "10.0.0.2"), ("backend", "10.0.0.3"), ("bifrost", "10.0.0.9")]
-                .into_iter()
-                .map(|(k, v)| (k.to_string(), ip(v)))
-                .collect(),
+            ips: [
+                ("rin", "10.0.0.2"),
+                ("backend", "10.0.0.3"),
+                ("bifrost", "10.0.0.9"),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), ip(v)))
+            .collect(),
             run_urls: HashMap::new(),
         };
         let tokens: HashMap<String, Principal> = [
@@ -168,22 +197,35 @@ mod tests {
         .into_iter()
         .map(|(k, v)| (k.to_string(), v))
         .collect();
-        let agents = vec!["rin".to_string(), "backend".to_string(), "bifrost".to_string()];
+        let agents = vec![
+            "rin".to_string(),
+            "backend".to_string(),
+            "bifrost".to_string(),
+        ];
         let auth = |header: Option<&'static str>, peer: &'static str| {
             let (resolver, tokens, agents) = (&resolver, &tokens, &agents);
             async move { authenticate(resolver, tokens, agents, header, ip(peer)).await }
         };
 
-        assert_eq!(auth(Some("Bearer tok-backend"), "10.0.0.3").await, Some(Principal::Agent("backend".into())));
+        assert_eq!(
+            auth(Some("Bearer tok-backend"), "10.0.0.3").await,
+            Some(Principal::Agent("backend".into()))
+        );
         // Another agent's token, from backend's container.
         assert_eq!(auth(Some("Bearer tok-rin"), "10.0.0.3").await, None);
         // Your token from any container.
         assert_eq!(auth(Some("Bearer tok-user"), "10.0.0.3").await, None);
         assert_eq!(auth(Some("Bearer tok-user"), "10.0.0.9").await, None);
         // Your token from your machine (the network gateway).
-        assert_eq!(auth(Some("Bearer tok-user"), "10.0.0.1").await, Some(Principal::User));
+        assert_eq!(
+            auth(Some("Bearer tok-user"), "10.0.0.1").await,
+            Some(Principal::User)
+        );
         // IPv4-mapped IPv6 peers are the same address.
-        assert_eq!(auth(Some("Bearer tok-backend"), "::ffff:10.0.0.3").await, Some(Principal::Agent("backend".into())));
+        assert_eq!(
+            auth(Some("Bearer tok-backend"), "::ffff:10.0.0.3").await,
+            Some(Principal::Agent("backend".into()))
+        );
         // No token, garbage, wrong scheme.
         assert_eq!(auth(None, "10.0.0.1").await, None);
         assert_eq!(auth(Some("Bearer nope"), "10.0.0.1").await, None);
@@ -199,9 +241,17 @@ mod tests {
         assert!(resolver.is_any(&["localhost"], localhost).await);
         // The name no longer resolves (container stopped, DNS down): still not you.
         assert!(resolver.is_any(&["rin-test-gone.invalid"], localhost).await);
-        assert!(!resolver.is_any(&["rin-test-gone.invalid"], ip("10.1.2.3")).await);
+        assert!(
+            !resolver
+                .is_any(&["rin-test-gone.invalid"], ip("10.1.2.3"))
+                .await
+        );
         // Now remembered as outside for a while, with no lookups.
-        assert!(!resolver.is_any(&["rin-test-gone.invalid"], ip("10.1.2.3")).await);
+        assert!(
+            !resolver
+                .is_any(&["rin-test-gone.invalid"], ip("10.1.2.3"))
+                .await
+        );
         // Containers' addresses are checked first: being remembered as outside never hides one.
         assert!(resolver.is_any(&["rin-test-gone.invalid"], localhost).await);
     }

@@ -1,14 +1,24 @@
 //! Plain-text tables and log lines for the terminal and for agents.
 
-#![cfg_attr(not(all(feature = "host", feature = "hub", feature = "agent")), allow(dead_code))]
+#![cfg_attr(
+    not(all(feature = "host", feature = "hub", feature = "agent")),
+    allow(dead_code)
+)]
 
 use crate::proto::{AgentsResponse, Event, Kind};
 
 /// Left-aligned columns, two spaces apart.
 pub fn table(rows: &[Vec<String>]) -> String {
     let columns = rows.iter().map(Vec::len).max().unwrap_or(0);
-    let widths: Vec<usize> =
-        (0..columns).map(|c| rows.iter().filter_map(|r| r.get(c)).map(|v| v.chars().count()).max().unwrap_or(0)).collect();
+    let widths: Vec<usize> = (0..columns)
+        .map(|c| {
+            rows.iter()
+                .filter_map(|r| r.get(c))
+                .map(|v| v.chars().count())
+                .max()
+                .unwrap_or(0)
+        })
+        .collect();
     let mut out = String::new();
     for row in rows {
         let cells: Vec<String> = row
@@ -24,7 +34,11 @@ pub fn table(rows: &[Vec<String>]) -> String {
 
 /// `rin agents` / `list_agents()`: the team, with the caller marked.
 pub fn agents(response: &AgentsResponse) -> String {
-    let mut rows = vec![["ID", "LABEL", "TYPE", "HARNESS", "SESSIONS", "QUEUED", ""].map(String::from).to_vec()];
+    let mut rows = vec![
+        ["ID", "LABEL", "TYPE", "HARNESS", "SESSIONS", "QUEUED", ""]
+            .map(String::from)
+            .to_vec(),
+    ];
     for a in &response.agents {
         rows.push(vec![
             a.id.clone(),
@@ -49,8 +63,19 @@ pub fn event(e: &Event) -> String {
     let when = utc(e.ts);
     let who = |v: &Option<String>| v.clone().unwrap_or_default();
     let header = match e.kind {
-        Kind::Message => format!("#{}  {} → {}  (hops {})", e.id, who(&e.from), who(&e.to), e.hops.unwrap_or(0)),
-        Kind::Reply => format!("#{}  {} → {}  reply", e.msg.unwrap_or(0), who(&e.from), who(&e.to)),
+        Kind::Message => format!(
+            "#{}  {} → {}  (hops {})",
+            e.id,
+            who(&e.from),
+            who(&e.to),
+            e.hops.unwrap_or(0)
+        ),
+        Kind::Reply => format!(
+            "#{}  {} → {}  reply",
+            e.msg.unwrap_or(0),
+            who(&e.from),
+            who(&e.to)
+        ),
         Kind::Error => format!("#{}  error → {}", e.msg.unwrap_or(0), who(&e.to)),
         Kind::Warning => return format!("{when}  {}\n", e.text),
     };
@@ -72,7 +97,12 @@ pub fn utc(ms: i64) -> String {
     let day = doy - (153 * mp + 2) / 5 + 1;
     let month = if mp < 10 { mp + 3 } else { mp - 9 };
     let year = yoe + era * 400 + i64::from(month <= 2);
-    format!("{year:04}-{month:02}-{day:02} {:02}:{:02}:{:02}Z", rest / 3600, rest % 3600 / 60, rest % 60)
+    format!(
+        "{year:04}-{month:02}-{day:02} {:02}:{:02}:{:02}Z",
+        rest / 3600,
+        rest % 3600 / 60,
+        rest % 60
+    )
 }
 
 #[cfg(test)]
@@ -99,7 +129,10 @@ mod tests {
             queued: 0,
             you,
         };
-        let text = agents(&AgentsResponse { agents: vec![row("rin", false), row("backend", true)], warnings: vec![] });
+        let text = agents(&AgentsResponse {
+            agents: vec![row("rin", false), row("backend", true)],
+            warnings: vec![],
+        });
         assert_eq!(
             text,
             "ID       LABEL             TYPE    HARNESS  SESSIONS  QUEUED\n\

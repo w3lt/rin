@@ -1,6 +1,9 @@
 //! What the hub, runtimes and clients send each other.
 
-#![cfg_attr(not(all(feature = "host", feature = "hub", feature = "agent")), allow(dead_code))]
+#![cfg_attr(
+    not(all(feature = "host", feature = "hub", feature = "agent")),
+    allow(dead_code)
+)]
 
 use serde::{Deserialize, Serialize};
 

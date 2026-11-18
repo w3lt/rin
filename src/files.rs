@@ -14,7 +14,8 @@ pub fn write_if_changed(path: &Path, bytes: &[u8]) -> Result<()> {
         return Ok(());
     }
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).with_context(|| format!("cannot create {}", parent.display()))?;
+        fs::create_dir_all(parent)
+            .with_context(|| format!("cannot create {}", parent.display()))?;
     }
     fs::write(path, bytes).with_context(|| format!("cannot write {}", path.display()))
 }
@@ -26,7 +27,8 @@ pub fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
         set_mode(path, 0o600)?;
     } else {
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).with_context(|| format!("cannot create {}", parent.display()))?;
+            fs::create_dir_all(parent)
+                .with_context(|| format!("cannot create {}", parent.display()))?;
         }
         fs::OpenOptions::new()
             .write(true)

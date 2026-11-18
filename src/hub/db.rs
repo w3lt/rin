@@ -41,7 +41,15 @@ struct Row<'a> {
 
 impl Default for Row<'_> {
     fn default() -> Self {
-        Row { kind: Kind::Message, msg: None, from: None, to: None, hops: None, text: "", agents: None }
+        Row {
+            kind: Kind::Message,
+            msg: None,
+            from: None,
+            to: None,
+            hops: None,
+            text: "",
+            agents: None,
+        }
     }
 }
 
@@ -50,12 +58,15 @@ pub struct Db {
 }
 
 pub fn now_ms() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis() as i64)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as i64)
 }
 
 impl Db {
     pub fn open(path: &Path) -> Result<Db> {
-        let conn = Connection::open(path).with_context(|| format!("cannot open {}", path.display()))?;
+        let conn =
+            Connection::open(path).with_context(|| format!("cannot open {}", path.display()))?;
         Db::init(conn)
     }
 
@@ -79,7 +90,9 @@ impl Db {
                agents TEXT
              );",
         )?;
-        Ok(Db { conn: Mutex::new(conn) })
+        Ok(Db {
+            conn: Mutex::new(conn),
+        })
     }
 
     fn insert(&self, row: Row) -> i64 {
@@ -100,22 +113,48 @@ impl Db {
 
     /// Logs a new message and returns its id.
     pub fn message(&self, from: &str, to: &str, hops: u32, text: &str) -> i64 {
-        self.insert(Row { kind: Kind::Message, from: Some(from), to: Some(to), hops: Some(hops), text, ..Row::default() })
+        self.insert(Row {
+            kind: Kind::Message,
+            from: Some(from),
+            to: Some(to),
+            hops: Some(hops),
+            text,
+            ..Row::default()
+        })
     }
 
     /// Logs the answer to message `msg`: sent by its receiver back to its sender.
     pub fn reply(&self, msg: i64, from: &str, to: &str, text: &str) {
-        self.insert(Row { kind: Kind::Reply, msg: Some(msg), from: Some(from), to: Some(to), text, ..Row::default() });
+        self.insert(Row {
+            kind: Kind::Reply,
+            msg: Some(msg),
+            from: Some(from),
+            to: Some(to),
+            text,
+            ..Row::default()
+        });
     }
 
     /// Logs an error returned to the sender of message `msg`.
     pub fn error(&self, msg: i64, from: &str, to: &str, text: &str) {
-        self.insert(Row { kind: Kind::Error, msg: Some(msg), from: Some(from), to: Some(to), text, ..Row::default() });
+        self.insert(Row {
+            kind: Kind::Error,
+            msg: Some(msg),
+            from: Some(from),
+            to: Some(to),
+            text,
+            ..Row::default()
+        });
     }
 
     pub fn warning(&self, agents: &[String], text: &str) {
         let agents = agents.join(",");
-        self.insert(Row { kind: Kind::Warning, text, agents: Some(&agents), ..Row::default() });
+        self.insert(Row {
+            kind: Kind::Warning,
+            text,
+            agents: Some(&agents),
+            ..Row::default()
+        });
     }
 
     /// Events after `after`, optionally only those involving `agent`.
@@ -128,18 +167,21 @@ impl Db {
                                 OR (',' || agents || ',') LIKE ('%,' || ?2 || ',%'))
              ORDER BY id LIMIT ?3",
         )?;
-        let rows = stmt.query_map(params![after, agent, crate::proto::LOG_PAGE as i64], |row| {
-            Ok(Event {
-                id: row.get(0)?,
-                ts: row.get(1)?,
-                kind: parse_kind(&row.get::<_, String>(2)?),
-                msg: row.get(3)?,
-                from: row.get(4)?,
-                to: row.get(5)?,
-                hops: row.get(6)?,
-                text: row.get(7)?,
-            })
-        })?;
+        let rows = stmt.query_map(
+            params![after, agent, crate::proto::LOG_PAGE as i64],
+            |row| {
+                Ok(Event {
+                    id: row.get(0)?,
+                    ts: row.get(1)?,
+                    kind: parse_kind(&row.get::<_, String>(2)?),
+                    msg: row.get(3)?,
+                    from: row.get(4)?,
+                    to: row.get(5)?,
+                    hops: row.get(6)?,
+                    text: row.get(7)?,
+                })
+            },
+        )?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 }
@@ -176,9 +218,19 @@ mod tests {
         assert_eq!(all[2].msg, Some(m2));
         assert_eq!(all[2].from.as_deref(), Some("frontend"));
 
-        let frontend: Vec<_> = db.events(Some("frontend"), 0).unwrap().into_iter().map(|e| e.text).collect();
+        let frontend: Vec<_> = db
+            .events(Some("frontend"), 0)
+            .unwrap()
+            .into_iter()
+            .map(|e| e.text)
+            .collect();
         assert_eq!(frontend, ["ping", "pong", "possible deadlock"]);
-        let backend: Vec<_> = db.events(Some("backend"), 0).unwrap().into_iter().map(|e| e.text).collect();
+        let backend: Vec<_> = db
+            .events(Some("backend"), 0)
+            .unwrap()
+            .into_iter()
+            .map(|e| e.text)
+            .collect();
         assert_eq!(backend, ["possible deadlock"]);
         // No prefix matches: "end" is not "backend".
         assert!(db.events(Some("end"), 0).unwrap().is_empty());

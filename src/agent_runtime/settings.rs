@@ -82,7 +82,8 @@ pub fn apply(home: &Path, settings: &Settings) -> Result<Vec<PathBuf>> {
                 };
                 match base_url {
                     Some(url) => json(home.join(".pi/agent/models.json"), &|s| {
-                        object(object(s, "providers"), provider).insert("baseUrl".into(), json!(url));
+                        object(object(s, "providers"), provider)
+                            .insert("baseUrl".into(), json!(url));
                     })?,
                     None => eprintln!(
                         "rin runtime: pi provider {provider:?} can't be routed through Bifrost (use anthropic/, openai/ or google/)"
@@ -127,7 +128,8 @@ fn merge_json(path: &Path, edit: &dyn Fn(&mut Map<String, Value>)) -> Result<boo
     let original: Value = if text.trim().is_empty() {
         json!({})
     } else {
-        serde_json::from_str(&text).with_context(|| format!("{} is not valid JSON; fix or delete it", path.display()))?
+        serde_json::from_str(&text)
+            .with_context(|| format!("{} is not valid JSON; fix or delete it", path.display()))?
     };
     let Value::Object(mut map) = original.clone() else {
         bail!("{} is not a JSON object; fix or delete it", path.display());
@@ -137,22 +139,31 @@ fn merge_json(path: &Path, edit: &dyn Fn(&mut Map<String, Value>)) -> Result<boo
     if updated == original {
         return Ok(false);
     }
-    write_atomic(path, format!("{}\n", serde_json::to_string_pretty(&updated)?).as_bytes())?;
+    write_atomic(
+        path,
+        format!("{}\n", serde_json::to_string_pretty(&updated)?).as_bytes(),
+    )?;
     Ok(true)
 }
 
 fn merge_codex(path: &Path, settings: &Settings, tool_timeout_secs: u64) -> Result<bool> {
     let text = read_or_empty(path)?;
-    let original: toml::Table =
-        toml::from_str(&text).with_context(|| format!("{} is not valid TOML; fix or delete it", path.display()))?;
+    let original: toml::Table = toml::from_str(&text)
+        .with_context(|| format!("{} is not valid TOML; fix or delete it", path.display()))?;
     let mut table = original.clone();
     table.insert("model".into(), toml::Value::String(settings.model.into()));
 
     let mut rin = toml::Table::new();
     rin.insert("command".into(), "rin".into());
     rin.insert("args".into(), toml::Value::Array(vec!["mcp".into()]));
-    rin.insert("env_vars".into(), toml::Value::Array(MCP_ENV.iter().map(|v| (*v).into()).collect()));
-    rin.insert("tool_timeout_sec".into(), toml::Value::Integer(tool_timeout_secs as i64));
+    rin.insert(
+        "env_vars".into(),
+        toml::Value::Array(MCP_ENV.iter().map(|v| (*v).into()).collect()),
+    );
+    rin.insert(
+        "tool_timeout_sec".into(),
+        toml::Value::Integer(tool_timeout_secs as i64),
+    );
     toml_table(&mut table, "mcp_servers").insert("rin".into(), toml::Value::Table(rin));
 
     match settings.bifrost {
@@ -163,7 +174,8 @@ fn merge_codex(path: &Path, settings: &Settings, tool_timeout_secs: u64) -> Resu
             provider.insert("base_url".into(), format!("{bifrost}/openai/v1").into());
             provider.insert("env_key".into(), "OPENAI_API_KEY".into());
             provider.insert("wire_api".into(), "responses".into());
-            toml_table(&mut table, "model_providers").insert("bifrost".into(), toml::Value::Table(provider));
+            toml_table(&mut table, "model_providers")
+                .insert("bifrost".into(), toml::Value::Table(provider));
         }
         None => {
             // Switched back to a subscription: stop routing through Bifrost.
@@ -180,7 +192,9 @@ fn merge_codex(path: &Path, settings: &Settings, tool_timeout_secs: u64) -> Resu
 }
 
 fn toml_table<'a>(table: &'a mut toml::Table, key: &str) -> &'a mut toml::Table {
-    let slot = table.entry(key.to_string()).or_insert_with(|| toml::Value::Table(toml::Table::new()));
+    let slot = table
+        .entry(key.to_string())
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
     if !slot.is_table() {
         *slot = toml::Value::Table(toml::Table::new());
     }
@@ -197,7 +211,8 @@ fn read_or_empty(path: &Path) -> Result<String> {
 
 fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).with_context(|| format!("cannot create {}", parent.display()))?;
+        fs::create_dir_all(parent)
+            .with_context(|| format!("cannot create {}", parent.display()))?;
     }
     let tmp = path.with_extension("rin-tmp");
     fs::write(&tmp, bytes).with_context(|| format!("cannot write {}", tmp.display()))?;
@@ -220,7 +235,12 @@ mod tests {
     }
 
     fn settings(harness: Harness, model: &str, bifrost: Option<&'static str>) -> Settings<'static> {
-        Settings { harness, model: Box::leak(model.to_string().into_boxed_str()), timeout: Duration::from_secs(1800), bifrost }
+        Settings {
+            harness,
+            model: Box::leak(model.to_string().into_boxed_str()),
+            timeout: Duration::from_secs(1800),
+            bifrost,
+        }
     }
 
     #[test]
@@ -236,7 +256,11 @@ mod tests {
         assert_eq!(state["mcpServers"]["rin"]["timeout"], 1_860_000);
 
         // L9: you add a key and change the model; a restart keeps yours and resets Rin's.
-        fs::write(home.join(".claude/settings.json"), r#"{"foo": 1, "model": "other", "env": {"X": "y"}}"#).unwrap();
+        fs::write(
+            home.join(".claude/settings.json"),
+            r#"{"foo": 1, "model": "other", "env": {"X": "y"}}"#,
+        )
+        .unwrap();
         apply(&home, &s).unwrap();
         let config = read_json(home.join(".claude/settings.json"));
         assert_eq!(config["foo"], 1);
@@ -254,16 +278,28 @@ mod tests {
         fs::write(home.join(".claude/settings.json"), "{ nope").unwrap();
         let err = apply(&home, &settings(Harness::ClaudeCode, "m", None)).unwrap_err();
         assert!(err.to_string().contains("not valid JSON"), "{err}");
-        assert_eq!(fs::read_to_string(home.join(".claude/settings.json")).unwrap(), "{ nope");
+        assert_eq!(
+            fs::read_to_string(home.join(".claude/settings.json")).unwrap(),
+            "{ nope"
+        );
     }
 
     #[test]
     fn codex_gets_model_mcp_and_gateway() {
         let home = temp_home("codex");
         fs::create_dir_all(home.join(".codex")).unwrap();
-        fs::write(home.join(".codex/config.toml"), "approval_policy = \"never\"\nmodel = \"x\"\n").unwrap();
-        apply(&home, &settings(Harness::Codex, "gpt-5-codex", Some("http://bifrost:8080"))).unwrap();
-        let config: toml::Table = toml::from_str(&fs::read_to_string(home.join(".codex/config.toml")).unwrap()).unwrap();
+        fs::write(
+            home.join(".codex/config.toml"),
+            "approval_policy = \"never\"\nmodel = \"x\"\n",
+        )
+        .unwrap();
+        apply(
+            &home,
+            &settings(Harness::Codex, "gpt-5-codex", Some("http://bifrost:8080")),
+        )
+        .unwrap();
+        let config: toml::Table =
+            toml::from_str(&fs::read_to_string(home.join(".codex/config.toml")).unwrap()).unwrap();
         assert_eq!(config["approval_policy"].as_str(), Some("never"));
         assert_eq!(config["model"].as_str(), Some("gpt-5-codex"));
         let rin = &config["mcp_servers"]["rin"];
@@ -271,28 +307,51 @@ mod tests {
         assert_eq!(rin["tool_timeout_sec"].as_integer(), Some(1860));
         assert_eq!(rin["env_vars"].as_array().unwrap().len(), 4);
         assert_eq!(config["model_provider"].as_str(), Some("bifrost"));
-        assert_eq!(config["model_providers"]["bifrost"]["base_url"].as_str(), Some("http://bifrost:8080/openai/v1"));
+        assert_eq!(
+            config["model_providers"]["bifrost"]["base_url"].as_str(),
+            Some("http://bifrost:8080/openai/v1")
+        );
 
         apply(&home, &settings(Harness::Codex, "gpt-5-codex", None)).unwrap();
-        let config: toml::Table = toml::from_str(&fs::read_to_string(home.join(".codex/config.toml")).unwrap()).unwrap();
+        let config: toml::Table =
+            toml::from_str(&fs::read_to_string(home.join(".codex/config.toml")).unwrap()).unwrap();
         assert!(config.get("model_provider").is_none());
     }
 
     #[test]
     fn pi_splits_provider_and_routes_it() {
         let home = temp_home("pi");
-        apply(&home, &settings(Harness::Pi, "anthropic/claude-sonnet-5-5", Some("http://bifrost:8080"))).unwrap();
+        apply(
+            &home,
+            &settings(
+                Harness::Pi,
+                "anthropic/claude-sonnet-5-5",
+                Some("http://bifrost:8080"),
+            ),
+        )
+        .unwrap();
         let config = read_json(home.join(".pi/agent/settings.json"));
         assert_eq!(config["defaultProvider"], "anthropic");
         assert_eq!(config["defaultModel"], "claude-sonnet-5-5");
         let models = read_json(home.join(".pi/agent/models.json"));
-        assert_eq!(models["providers"]["anthropic"]["baseUrl"], "http://bifrost:8080/anthropic");
+        assert_eq!(
+            models["providers"]["anthropic"]["baseUrl"],
+            "http://bifrost:8080/anthropic"
+        );
     }
 
     #[test]
     fn antigravity_gets_mcp_and_model() {
         let home = temp_home("agy");
-        apply(&home, &settings(Harness::Antigravity, "gemini-3-pro", Some("http://bifrost:8080"))).unwrap();
+        apply(
+            &home,
+            &settings(
+                Harness::Antigravity,
+                "gemini-3-pro",
+                Some("http://bifrost:8080"),
+            ),
+        )
+        .unwrap();
         let mcp = read_json(home.join(".gemini/config/mcp_config.json"));
         assert_eq!(mcp["mcpServers"]["rin"]["timeoutSeconds"], 1860);
         let config = read_json(home.join(".gemini/antigravity-cli/settings.json"));

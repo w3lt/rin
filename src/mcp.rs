@@ -27,12 +27,22 @@ pub struct RinMcp {
 
 #[tool_router]
 impl RinMcp {
-    #[tool(description = "Send a message to another agent on your Rin team and wait for its final answer, which is returned. The receiver starts a fresh session for each message.")]
-    async fn send_message(&self, Parameters(args): Parameters<SendMessage>) -> Result<String, String> {
-        self.client.send(&args.to, &args.text, self.hops + 1).await.map_err(|e| e.to_string())
+    #[tool(
+        description = "Send a message to another agent on your Rin team and wait for its final answer, which is returned. The receiver starts a fresh session for each message."
+    )]
+    async fn send_message(
+        &self,
+        Parameters(args): Parameters<SendMessage>,
+    ) -> Result<String, String> {
+        self.client
+            .send(&args.to, &args.text, self.hops + 1)
+            .await
+            .map_err(|e| e.to_string())
     }
 
-    #[tool(description = "List the agents on your Rin team: id, label, type, harness, delegated sessions running (n/max) and messages queued. You are marked \"you\".")]
+    #[tool(
+        description = "List the agents on your Rin team: id, label, type, harness, delegated sessions running (n/max) and messages queued. You are marked \"you\"."
+    )]
     async fn list_agents(&self) -> Result<String, String> {
         let response = self.client.agents().await.map_err(|e| e.to_string())?;
         Ok(crate::display::agents(&response))
@@ -43,8 +53,12 @@ impl RinMcp {
 impl ServerHandler for RinMcp {}
 
 pub async fn main() -> Result<()> {
-    let client = Client::from_agent_env().ok_or_else(|| anyhow!("RIN_TOKEN is not set: rin mcp runs inside an agent container"))?;
-    let server = RinMcp { client: Arc::new(client), hops: current_hops() };
+    let client = Client::from_agent_env()
+        .ok_or_else(|| anyhow!("RIN_TOKEN is not set: rin mcp runs inside an agent container"))?;
+    let server = RinMcp {
+        client: Arc::new(client),
+        hops: current_hops(),
+    };
     let running = server.serve(rmcp::transport::stdio()).await?;
     running.waiting().await?;
     Ok(())
