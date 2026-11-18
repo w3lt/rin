@@ -64,6 +64,11 @@ jobs:
       - name: Test
         run: cargo test --all-targets --all-features
 
+      # The images build exactly this (images/Dockerfile); with every feature
+      # on, a feature gate that breaks it would go unnoticed until `rin up`.
+      - name: Check the build the images use
+        run: cargo check --locked --no-default-features --features hub,agent
+
       - name: Package dry run
         run: cargo publish --dry-run --locked --package "$CRATE_NAME"
 
