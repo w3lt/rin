@@ -1,11 +1,14 @@
 [package]
-name = "rin"
+name = "tohsaka"
 version = "0.1.0"
 edition = "2024"
 description = "Rin (Tohsaka) is all you need to deploy a team of AI agents. She is the best waifu btw"
 authors = ["Welt"]
 repository = "https://github.com/w3lt/rin"
 license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["rin-tohsaka", "cli", "ai-agent", "swarm"]
+exclude = ["/assets"]
 
 [[bin]]
 name = "rin"
@@ -16,12 +19,12 @@ default = ["host"]
 host = ["dep:serde-saphyr", "dep:getrandom", "dep:jsonschema"]
 hub = ["dep:axum", "dep:rusqlite", "dep:jsonschema", "tokio/signal"]
 agent = [
-  "dep:axum",
-  "dep:rmcp",
-  "dep:toml",
-  "dep:nix",
-  "tokio/process",
-  "tokio/signal",
+    "dep:axum",
+    "dep:rmcp",
+    "dep:toml",
+    "dep:nix",
+    "tokio/process",
+    "tokio/signal",
 ]
 
 [dependencies]
@@ -31,17 +34,17 @@ clap = { version = "4.6.8", features = ["derive"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 tokio = { version = "1.54.1", features = [
-  "rt-multi-thread",
-  "macros",
-  "net",
-  "time",
-  "sync",
+    "rt-multi-thread",
+    "macros",
+    "net",
+    "time",
+    "sync",
 ] }
 reqwest = { version = "0.13.5", default-features = false, features = ["json"] }
 
 # host
 serde-saphyr = { version = "2.1.1", default-features = false, features = [
-  "deserialize",
+    "deserialize",
 ], optional = true }
 getrandom = { version = "0.4.3", optional = true }
 
@@ -56,9 +59,9 @@ rusqlite = { version = "0.43.0", features = ["bundled"], optional = true }
 
 # agent
 rmcp = { version = "3.11.0", default-features = false, features = [
-  "server",
-  "macros",
-  "transport-io",
+    "server",
+    "macros",
+    "transport-io",
 ], optional = true }
 toml = { version = "1.2.1", optional = true }
 nix = { version = "0.32.0", features = ["signal"], optional = true }
