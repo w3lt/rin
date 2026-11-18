@@ -6,9 +6,13 @@
 FROM rust:1.98-slim-trixie AS build
 ARG RIN_GIT_REV
 RUN test -n "$RIN_GIT_REV" || (echo "RIN_GIT_REV is required" >&2; exit 1)
+# One `rin` for every container (features hub + agent): it is compiled once, and
+# `base` below carries it into every image. No package name: the repository
+# holds one package, whatever it is called on crates.io; `--bin rin` is the
+# executable.
 RUN cargo install --locked --root /out \
       --git https://github.com/w3lt/rin --rev "$RIN_GIT_REV" \
-      --no-default-features --features hub,agent rin
+      --no-default-features --features hub,agent --bin rin
 
 # --- shared base: Debian, common tools, rin, user agent (UID 1000) --------------
 FROM debian:trixie-20261104-slim AS base
