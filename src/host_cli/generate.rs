@@ -9,7 +9,7 @@ use serde_json::json;
 
 use crate::compose;
 use crate::config::{self, Authentication, Config, VERSION};
-use crate::files::{random_hex, write_if_changed, write_private};
+use crate::files::{random_hex, write_if_changed, write_private, write_shared};
 use crate::team::{self, Team, Tokens, read_tokens};
 
 pub const DOCKERFILE: &str = include_str!("../../images/Dockerfile");
@@ -158,7 +158,7 @@ fn write_instructions(team: &Team, sources: &[(String, PathBuf)]) -> Result<()> 
     let root = team.dir.join("instructions");
     for (id, file) in sources {
         let text = fs::read(file).with_context(|| format!("cannot read {}", file.display()))?;
-        write_if_changed(&root.join(id).join("INSTRUCTIONS.md"), &text)?;
+        write_shared(&root.join(id).join("INSTRUCTIONS.md"), &text)?;
     }
     remove_others(&root, sources.iter().map(|(id, _)| id.clone()))
 }
@@ -337,7 +337,7 @@ fn write_bifrost(
             "virtual_keys": vk_config,
         },
     });
-    write_if_changed(
+    write_shared(
         &dir.join("config.json"),
         format!("{}\n", serde_json::to_string_pretty(&bifrost_config)?).as_bytes(),
     )?;
@@ -478,6 +478,31 @@ mod tests {
                 .mode()
                 & 0o777;
             assert_eq!(mode, 0o600, "{path}");
+        }
+    }
+
+    #[test]
+    fn files_read_inside_containers_are_readable_by_their_users() {
+        // With a umask like 077 these would be yours only, and bind mounts keep
+        // that: the agents (UID 1000) and Bifrost could not read them.
+        let f = Fixture::new("shared");
+        f.generate().unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        let shared = [
+            "instructions/backend/INSTRUCTIONS.md",
+            "bifrost/config.json",
+        ];
+        for path in shared {
+            crate::files::set_mode(&f.team().join(path), 0o600).unwrap();
+        }
+        f.generate().unwrap();
+        for path in shared {
+            let mode = fs::metadata(f.team().join(path))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777;
+            assert_eq!(mode, 0o644, "{path}");
         }
     }
 

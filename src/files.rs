@@ -20,6 +20,15 @@ pub fn write_if_changed(path: &Path, bytes: &[u8]) -> Result<()> {
     fs::write(path, bytes).with_context(|| format!("cannot write {}", path.display()))
 }
 
+/// Like [`write_if_changed`], for files a container reads as its own user
+/// (UID 1000 in the agent and Bifrost images): a bind mount keeps your
+/// ownership and mode, so they are readable by all whatever your umask. They
+/// hold no secrets, and `teams/` lets nobody but you in on your machine.
+pub fn write_shared(path: &Path, bytes: &[u8]) -> Result<()> {
+    write_if_changed(path, bytes)?;
+    set_mode(path, 0o644)
+}
+
 /// Like [`write_if_changed`], for secrets: readable by you only, from the
 /// moment the file exists.
 pub fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
