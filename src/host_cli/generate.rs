@@ -12,12 +12,14 @@ use crate::config::{self, Authentication, Config, VERSION};
 use crate::files::{random_hex, write_if_changed, write_private};
 use crate::team::{self, Team, Tokens, TokensExt};
 
-
-pub const DOCKERFILE: &str = include_str!("../images/Dockerfile");
+pub const DOCKERFILE: &str = include_str!("../../images/Dockerfile");
 
 /// Provider keys Bifrost knows how to use, by `keys.env` variable.
-const PROVIDER_KEYS: [(&str, &str); 3] =
-    [("ANTHROPIC_API_KEY", "anthropic"), ("OPENAI_API_KEY", "openai"), ("GEMINI_API_KEY", "gemini")];
+const PROVIDER_KEYS: [(&str, &str); 3] = [
+    ("ANTHROPIC_API_KEY", "anthropic"),
+    ("OPENAI_API_KEY", "openai"),
+    ("GEMINI_API_KEY", "gemini"),
+];
 
 #[derive(Debug)]
 pub struct Generated {
@@ -27,7 +29,8 @@ pub struct Generated {
 
 /// Writes the team for `file` into `home` (`$RIN_HOME`). Images build `rin` from `git_rev`.
 pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) -> Result<Generated> {
-    let text = fs::read_to_string(file).with_context(|| format!("cannot read {}", file.display()))?;
+    let text =
+        fs::read_to_string(file).with_context(|| format!("cannot read {}", file.display()))?;
     let config = config::from_yaml(&text).with_context(|| file.display().to_string())?;
     if config.version != VERSION {
         bail!(
@@ -43,7 +46,8 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
 
     let team = Team::at(home, &config.name);
     let new_home = !home.exists();
-    fs::create_dir_all(&team.dir).with_context(|| format!("cannot create {}", team.dir.display()))?;
+    fs::create_dir_all(&team.dir)
+        .with_context(|| format!("cannot create {}", team.dir.display()))?;
     // Only lock down what Rin made: $RIN_HOME may be a folder you use for more.
     if new_home {
         crate::files::set_mode(home, 0o700)?;
@@ -59,7 +63,10 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
     }
 
     let source = fs::canonicalize(file).unwrap_or_else(|_| file.to_path_buf());
-    write_if_changed(&team.dir.join("source"), format!("{}\n", source.display()).as_bytes())?;
+    write_if_changed(
+        &team.dir.join("source"),
+        format!("{}\n", source.display()).as_bytes(),
+    )?;
     let rin_json = format!("{}\n", serde_json::to_string_pretty(&config)?);
     write_if_changed(&team.rin_json(), rin_json.as_bytes())?;
     write_instructions(&team, &sources)?;
@@ -90,7 +97,11 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
     write_env_files(&team, &config, &tokens, &virtual_keys)?;
 
     let hub_files_hash = compose::files_hash(&[rin_json.as_bytes(), tokens_json.as_bytes()]);
-    let compose = compose::render(&compose::Inputs { config: &config, git_rev, hub_files_hash: &hub_files_hash });
+    let compose = compose::render(&compose::Inputs {
+        config: &config,
+        git_rev,
+        hub_files_hash: &hub_files_hash,
+    });
     write_if_changed(&team.compose_file(), compose.as_bytes())?;
 
     team::set_current(home, &config.name)?;
@@ -111,7 +122,10 @@ fn check_instructions(config: &Config, dir: &Path) -> Result<Vec<(String, PathBu
     for entry in entries {
         let name = entry.file_name().to_string_lossy().into_owned();
         if !name.starts_with('.') && entry.path().is_dir() && config.agent(&name).is_none() {
-            problems.push(format!("{}: no agent with id {name:?} in rin.yml", entry.path().display()));
+            problems.push(format!(
+                "{}: no agent with id {name:?} in rin.yml",
+                entry.path().display()
+            ));
         }
     }
     let mut sources = Vec::new();
@@ -119,7 +133,11 @@ fn check_instructions(config: &Config, dir: &Path) -> Result<Vec<(String, PathBu
         let folder = dir.join(&agent.id);
         let file = folder.join("INSTRUCTIONS.md");
         if !folder.is_dir() {
-            problems.push(format!("agent {:?} has no folder {}", agent.id, folder.display()));
+            problems.push(format!(
+                "agent {:?} has no folder {}",
+                agent.id,
+                folder.display()
+            ));
         } else if !file.is_file() {
             problems.push(format!("{}: INSTRUCTIONS.md is missing", folder.display()));
         } else {
@@ -127,7 +145,10 @@ fn check_instructions(config: &Config, dir: &Path) -> Result<Vec<(String, PathBu
         }
     }
     if !problems.is_empty() {
-        bail!("instructions don't match rin.yml:\n  {}", problems.join("\n  "));
+        bail!(
+            "instructions don't match rin.yml:\n  {}",
+            problems.join("\n  ")
+        );
     }
     Ok(sources)
 }
@@ -145,11 +166,17 @@ fn write_instructions(team: &Team, sources: &[(String, PathBuf)]) -> Result<()> 
 /// Removes entries of `dir` not in `keep`.
 fn remove_others(dir: &Path, keep: impl IntoIterator<Item = String>) -> Result<()> {
     let keep: Vec<String> = keep.into_iter().collect();
-    let Ok(entries) = fs::read_dir(dir) else { return Ok(()) };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return Ok(());
+    };
     for entry in entries.filter_map(|e| e.ok()) {
         if !keep.contains(&entry.file_name().to_string_lossy().into_owned()) {
             let path = entry.path();
-            let result = if path.is_dir() { fs::remove_dir_all(&path) } else { fs::remove_file(&path) };
+            let result = if path.is_dir() {
+                fs::remove_dir_all(&path)
+            } else {
+                fs::remove_file(&path)
+            };
             result.with_context(|| format!("cannot remove {}", path.display()))?;
         }
     }
@@ -160,14 +187,18 @@ fn remove_others(dir: &Path, keep: impl IntoIterator<Item = String>) -> Result<(
 /// (team `a` agent `b-c` and team `a-b` agent `c` are both `rin-a-b-c`).
 fn check_names(home: &Path, config: &Config) -> Result<()> {
     let ours = compose::docker_names(config);
-    let Ok(entries) = fs::read_dir(home.join("teams")) else { return Ok(()) };
+    let Ok(entries) = fs::read_dir(home.join("teams")) else {
+        return Ok(());
+    };
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
         if name == config.name {
             continue;
         }
         // A team folder Rin can't read (another version, half deleted) has no say.
-        let Ok(other) = Team::at(home, &name).config() else { continue };
+        let Ok(other) = Team::at(home, &name).config() else {
+            continue;
+        };
         let theirs = compose::docker_names(&other);
         if let Some((kind, clash)) = ours.iter().find(|n| theirs.contains(n)) {
             bail!(
@@ -194,7 +225,12 @@ fn tokens(team: &Team, config: &Config) -> Result<Tokens> {
 }
 
 /// `env/<id>.env`: the agent's own token, plus its Bifrost virtual key if it uses an API key.
-fn write_env_files(team: &Team, config: &Config, tokens: &Tokens, virtual_keys: &BTreeMap<String, String>) -> Result<()> {
+fn write_env_files(
+    team: &Team,
+    config: &Config,
+    tokens: &Tokens,
+    virtual_keys: &BTreeMap<String, String>,
+) -> Result<()> {
     let dir = team.dir.join("env");
     for agent in &config.agents {
         let mut text = format!("RIN_TOKEN={}\n", tokens[&agent.id]);
@@ -220,7 +256,11 @@ fn provider_names(keys_env: &Path) -> Vec<&'static str> {
         .filter(|(_, value)| !value.trim().is_empty())
         .map(|(name, _)| name.trim())
         .collect();
-    PROVIDER_KEYS.iter().filter(|(var, _)| defined.contains(var)).map(|(_, p)| *p).collect()
+    PROVIDER_KEYS
+        .iter()
+        .filter(|(var, _)| defined.contains(var))
+        .map(|(_, p)| *p)
+        .collect()
 }
 
 fn env_name(id: &str) -> String {
@@ -230,7 +270,11 @@ fn env_name(id: &str) -> String {
 /// Writes `bifrost/config.json` (no secrets: values are `env.` references) and
 /// `bifrost/bifrost.env` (admin login and one virtual key per API-key agent,
 /// kept across runs). Returns agent id → virtual key.
-fn write_bifrost(team: &Team, config: &Config, providers: &[&str]) -> Result<BTreeMap<String, String>> {
+fn write_bifrost(
+    team: &Team,
+    config: &Config,
+    providers: &[&str],
+) -> Result<BTreeMap<String, String>> {
     let dir = team.dir.join("bifrost");
     let env_file = dir.join("bifrost.env");
     let old: BTreeMap<String, String> = fs::read_to_string(&env_file)
@@ -248,10 +292,17 @@ fn write_bifrost(team: &Team, config: &Config, providers: &[&str]) -> Result<BTr
 
     let mut env = BTreeMap::new();
     env.insert("BIFROST_ADMIN_USER".to_string(), "admin".to_string());
-    env.insert("BIFROST_ADMIN_PASSWORD".to_string(), keep_or_new("BIFROST_ADMIN_PASSWORD", "")?);
+    env.insert(
+        "BIFROST_ADMIN_PASSWORD".to_string(),
+        keep_or_new("BIFROST_ADMIN_PASSWORD", "")?,
+    );
     let mut virtual_keys = BTreeMap::new();
     let mut vk_config = Vec::new();
-    for agent in config.agents.iter().filter(|a| a.authentication == Authentication::ApiKey) {
+    for agent in config
+        .agents
+        .iter()
+        .filter(|a| a.authentication == Authentication::ApiKey)
+    {
         let name = env_name(&agent.id);
         let key = keep_or_new(&name, "sk-bf-")?;
         vk_config.push(json!({
@@ -286,7 +337,10 @@ fn write_bifrost(team: &Team, config: &Config, providers: &[&str]) -> Result<BTr
             "virtual_keys": vk_config,
         },
     });
-    write_if_changed(&dir.join("config.json"), format!("{}\n", serde_json::to_string_pretty(&bifrost_config)?).as_bytes())?;
+    write_if_changed(
+        &dir.join("config.json"),
+        format!("{}\n", serde_json::to_string_pretty(&bifrost_config)?).as_bytes(),
+    )?;
     let text: String = env.iter().map(|(k, v)| format!("{k}={v}\n")).collect();
     write_private(&env_file, text.as_bytes())?;
     crate::files::set_mode(&dir, 0o700)?;
@@ -298,7 +352,7 @@ mod tests {
     use super::*;
     use std::collections::BTreeMap;
 
-    const EXAMPLE: &str = include_str!("../examples/team/rin.yml");
+    const EXAMPLE: &str = include_str!("../../examples/team/rin.yml");
 
     /// A project folder (copy of examples/team, edited) and an empty `$RIN_HOME`.
     struct Fixture {
@@ -307,7 +361,8 @@ mod tests {
 
     impl Fixture {
         fn new(name: &str) -> Fixture {
-            let root = std::env::temp_dir().join(format!("rin-generate-{name}-{}", std::process::id()));
+            let root =
+                std::env::temp_dir().join(format!("rin-generate-{name}-{}", std::process::id()));
             let _ = fs::remove_dir_all(&root);
             for id in ["rin", "backend", "frontend"] {
                 let dir = root.join("project/agents").join(id);
@@ -316,7 +371,11 @@ mod tests {
             }
             fs::write(root.join("project/rin.yml"), EXAMPLE).unwrap();
             fs::create_dir_all(root.join("home")).unwrap();
-            fs::write(root.join("home/keys.env"), "# mine\nANTHROPIC_API_KEY=sk-ant-secret\nOPENAI_API_KEY=\n").unwrap();
+            fs::write(
+                root.join("home/keys.env"),
+                "# mine\nANTHROPIC_API_KEY=sk-ant-secret\nOPENAI_API_KEY=\n",
+            )
+            .unwrap();
             Fixture { root }
         }
 
@@ -336,7 +395,12 @@ mod tests {
         }
 
         fn generate(&self) -> Result<Generated> {
-            generate(&self.root.join("project/rin.yml"), &self.root.join("project/agents"), &self.home(), "v0.1.0")
+            generate(
+                &self.root.join("project/rin.yml"),
+                &self.root.join("project/agents"),
+                &self.home(),
+                "v0.1.0",
+            )
         }
 
         fn read(&self, path: &str) -> String {
@@ -348,7 +412,11 @@ mod tests {
             fn walk(dir: &Path, out: &mut BTreeMap<PathBuf, Vec<u8>>) {
                 for entry in fs::read_dir(dir).unwrap().flatten() {
                     let path = entry.path();
-                    if path.is_dir() { walk(&path, out) } else { out.insert(path.clone(), fs::read(&path).unwrap()); }
+                    if path.is_dir() {
+                        walk(&path, out)
+                    } else {
+                        out.insert(path.clone(), fs::read(&path).unwrap());
+                    }
                 }
             }
             let mut out = BTreeMap::new();
@@ -369,23 +437,46 @@ mod tests {
         let generated = f.generate().unwrap();
         assert!(generated.warnings.is_empty(), "{:?}", generated.warnings);
         for path in [
-            "source", "docker-compose.yml", "rin.json", "images/Dockerfile", "tokens.json",
-            "instructions/rin/INSTRUCTIONS.md", "instructions/backend/INSTRUCTIONS.md", "instructions/frontend/INSTRUCTIONS.md",
-            "env/rin.env", "env/backend.env", "env/frontend.env", "bifrost/config.json", "bifrost/bifrost.env",
+            "source",
+            "docker-compose.yml",
+            "rin.json",
+            "images/Dockerfile",
+            "tokens.json",
+            "instructions/rin/INSTRUCTIONS.md",
+            "instructions/backend/INSTRUCTIONS.md",
+            "instructions/frontend/INSTRUCTIONS.md",
+            "env/rin.env",
+            "env/backend.env",
+            "env/frontend.env",
+            "bifrost/config.json",
+            "bifrost/bifrost.env",
         ] {
             assert!(f.team().join(path).is_file(), "missing {path}");
         }
-        assert_eq!(fs::read_to_string(f.home().join("current")).unwrap(), "my-team\n");
+        assert_eq!(
+            fs::read_to_string(f.home().join("current")).unwrap(),
+            "my-team\n"
+        );
         assert!(f.read("source").trim_end().ends_with("project/rin.yml"));
-        assert_eq!(f.read("instructions/backend/INSTRUCTIONS.md"), "# backend\n");
+        assert_eq!(
+            f.read("instructions/backend/INSTRUCTIONS.md"),
+            "# backend\n"
+        );
 
         let rin_json: serde_json::Value = serde_json::from_str(&f.read("rin.json")).unwrap();
-        assert_eq!(rin_json["messaging"], json!({"timeout": "30m", "maxHops": 5}));
+        assert_eq!(
+            rin_json["messaging"],
+            json!({"timeout": "30m", "maxHops": 5})
+        );
 
         // Secrets are yours only.
         use std::os::unix::fs::PermissionsExt;
         for path in ["tokens.json", "env/backend.env", "bifrost/bifrost.env"] {
-            let mode = fs::metadata(f.team().join(path)).unwrap().permissions().mode() & 0o777;
+            let mode = fs::metadata(f.team().join(path))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777;
             assert_eq!(mode, 0o600, "{path}");
         }
     }
@@ -408,8 +499,14 @@ mod tests {
         fs::remove_file(f.team().join("tokens.json")).unwrap();
         f.generate().unwrap();
         let new: Tokens = serde_json::from_str(&f.read("tokens.json")).unwrap();
-        assert_eq!(old.keys().collect::<Vec<_>>(), ["backend", "frontend", "rin", "user"]);
-        assert_eq!(old.keys().collect::<Vec<_>>(), new.keys().collect::<Vec<_>>());
+        assert_eq!(
+            old.keys().collect::<Vec<_>>(),
+            ["backend", "frontend", "rin", "user"]
+        );
+        assert_eq!(
+            old.keys().collect::<Vec<_>>(),
+            new.keys().collect::<Vec<_>>()
+        );
         for (id, token) in &old {
             assert_ne!(token, &new[id], "{id}");
             assert!(id == "user" || f.read(&format!("env/{id}.env")).contains(&new[id]));
@@ -425,7 +522,11 @@ mod tests {
         let f = Fixture::new("hub-files");
         let label = |f: &Fixture| {
             let compose = f.read("docker-compose.yml");
-            compose.lines().find(|l| l.contains("rin.files:")).unwrap().to_string()
+            compose
+                .lines()
+                .find(|l| l.contains("rin.files:"))
+                .unwrap()
+                .to_string()
         };
         f.generate().unwrap();
         let first = label(&f);
@@ -450,7 +551,10 @@ mod tests {
         let agents = f.root.join("project/agents");
         fs::rename(agents.join("backend"), agents.join("team-backend")).unwrap();
         let error = f.generate().unwrap_err().to_string();
-        assert!(error.contains(r#"name "rin-my-team-backend", which team "my-team" already uses"#), "{error}");
+        assert!(
+            error.contains(r#"name "rin-my-team-backend", which team "my-team" already uses"#),
+            "{error}"
+        );
         assert!(!f.home().join("teams/my").exists());
     }
 
@@ -461,15 +565,26 @@ mod tests {
         let compose = f.read("docker-compose.yml");
         let tokens: Tokens = serde_json::from_str(&f.read("tokens.json")).unwrap();
         let bifrost_env = f.read("bifrost/bifrost.env");
-        let secrets = tokens.values().cloned().chain(bifrost_env.lines().filter_map(|l| l.split_once('=')).map(|(_, v)| v.to_string()));
+        let secrets = tokens.values().cloned().chain(
+            bifrost_env
+                .lines()
+                .filter_map(|l| l.split_once('='))
+                .map(|(_, v)| v.to_string()),
+        );
         for secret in secrets.filter(|s| s != "admin") {
             assert!(!compose.contains(&secret));
             assert!(!f.read("bifrost/config.json").contains(&secret));
         }
-        assert!(!compose.contains("sk-ant-secret") && !f.read("bifrost/config.json").contains("sk-ant-secret"));
+        assert!(
+            !compose.contains("sk-ant-secret")
+                && !f.read("bifrost/config.json").contains("sk-ant-secret")
+        );
         for id in ["rin", "backend", "frontend"] {
             let env = f.read(&format!("env/{id}.env"));
-            let rin_tokens: Vec<&str> = env.lines().filter_map(|l| l.strip_prefix("RIN_TOKEN=")).collect();
+            let rin_tokens: Vec<&str> = env
+                .lines()
+                .filter_map(|l| l.strip_prefix("RIN_TOKEN="))
+                .collect();
             assert_eq!(rin_tokens, [tokens[id].as_str()], "{id}");
             for (other, token) in &tokens {
                 if other != id {
@@ -478,11 +593,25 @@ mod tests {
             }
         }
         // Only the API-key agent gets a virtual key; it is in Bifrost's env, as a reference in config.json.
-        assert!(f.read("env/backend.env").contains("ANTHROPIC_API_KEY=sk-bf-"));
+        assert!(
+            f.read("env/backend.env")
+                .contains("ANTHROPIC_API_KEY=sk-bf-")
+        );
         assert!(!f.read("env/frontend.env").contains("sk-bf-"));
-        let config: serde_json::Value = serde_json::from_str(&f.read("bifrost/config.json")).unwrap();
-        assert_eq!(config["governance"]["virtual_keys"][0]["value"], "env.BIFROST_VK_BACKEND");
-        assert_eq!(config["providers"].as_object().unwrap().keys().collect::<Vec<_>>(), ["anthropic"]);
+        let config: serde_json::Value =
+            serde_json::from_str(&f.read("bifrost/config.json")).unwrap();
+        assert_eq!(
+            config["governance"]["virtual_keys"][0]["value"],
+            "env.BIFROST_VK_BACKEND"
+        );
+        assert_eq!(
+            config["providers"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .collect::<Vec<_>>(),
+            ["anthropic"]
+        );
     }
 
     #[test]
@@ -509,8 +638,16 @@ mod tests {
         ] {
             assert!(compose.contains(line), "no {line:?} in\n{compose}");
         }
-        assert_eq!(compose.matches("ports:").count(), 1, "only the hub publishes a port");
-        assert_eq!(compose.matches("./tokens.json:").count(), 1, "only the hub mounts tokens.json");
+        assert_eq!(
+            compose.matches("ports:").count(),
+            1,
+            "only the hub publishes a port"
+        );
+        assert_eq!(
+            compose.matches("./tokens.json:").count(),
+            1,
+            "only the hub mounts tokens.json"
+        );
         assert!(!compose.contains("docker.sock"));
     }
 
@@ -530,7 +667,10 @@ mod tests {
     #[test]
     fn no_bifrost_without_api_keys() {
         let f = Fixture::new("c6");
-        f.edit("harness: pi\n    authentication: apiKey", "harness: claude-code\n    authentication: subscription");
+        f.edit(
+            "harness: pi\n    authentication: apiKey",
+            "harness: claude-code\n    authentication: subscription",
+        );
         f.generate().unwrap();
         let compose = f.read("docker-compose.yml");
         assert!(!compose.contains("bifrost"), "{compose}");
@@ -547,7 +687,10 @@ mod tests {
 
         fs::remove_file(f.root.join("project/agents/frontend/INSTRUCTIONS.md")).unwrap();
         let e = format!("{:#}", f.generate().unwrap_err());
-        assert!(e.contains("agents/frontend: INSTRUCTIONS.md is missing"), "{e}");
+        assert!(
+            e.contains("agents/frontend: INSTRUCTIONS.md is missing"),
+            "{e}"
+        );
 
         fs::remove_dir_all(f.root.join("project/agents/frontend")).unwrap();
         let e = format!("{:#}", f.generate().unwrap_err());

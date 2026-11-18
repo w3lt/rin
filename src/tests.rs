@@ -15,7 +15,7 @@ use crate::hub::auth::{Principal, Resolver};
 use crate::hub::db::Db;
 use crate::hub::{Hub, HubError};
 use crate::proto::{Kind, SendRequest};
-use crate::runtime::Runtime;
+use crate::agent_runtime::Runtime;
 
 /// Answers `<first prompt line> | hops=<RIN_HOPS> | <message>`; `sleep N …` sleeps N seconds
 /// (in a child process, whose pid it records), `fail` exits 3, `bg` leaves a
@@ -44,7 +44,12 @@ async fn serve(router: axum::Router) -> SocketAddr {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     tokio::spawn(async move {
-        axum::serve(listener, router.into_make_service_with_connect_info::<SocketAddr>()).await.unwrap();
+        axum::serve(
+            listener,
+            router.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await
+        .unwrap();
     });
     addr
 }
@@ -79,26 +84,55 @@ async fn team(name: &str, timeout: Duration) -> Team {
     for id in ["a", "b", "stale"] {
         let home = dir.join(id);
         std::fs::create_dir_all(&home).unwrap();
-        let token = if id == "stale" { "token-from-before" } else { &tokens[id] };
-        let mut runtime = Runtime::new(Harness::ClaudeCode, "fake-model", Duration::from_secs(60), token, "http://127.0.0.1:7000", &home);
+        let token = if id == "stale" {
+            "token-from-before"
+        } else {
+            &tokens[id]
+        };
+        let mut runtime = Runtime::new(
+            Harness::ClaudeCode,
+            "fake-model",
+            Duration::from_secs(60),
+            token,
+            "http://127.0.0.1:7000",
+            &home,
+        );
         runtime.program = Some(fake.clone());
-        let addr = serve(crate::runtime::router(Arc::new(runtime))).await;
+        let addr = serve(crate::agent_runtime::router(Arc::new(runtime))).await;
         run_urls.insert(id.to_string(), format!("http://{addr}/run"));
     }
     // Nothing listens there: `down`'s container is stopped.
-    let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap();
+    let closed = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap();
     run_urls.insert("down".to_string(), format!("http://{closed}/run"));
 
     // Agents' "container IPs" are not 127.0.0.1, so test requests over HTTP come from "your machine".
-    let ips = [("a", "10.9.0.2"), ("b", "10.9.0.3"), ("down", "10.9.0.4"), ("stale", "10.9.0.5")]
-        .into_iter()
-        .map(|(id, ip)| (id.to_string(), ip.parse().unwrap()))
-        .collect();
-    let mut hub = Hub::new(config, tokens.clone(), Resolver::Static { ips, run_urls }, Db::memory());
+    let ips = [
+        ("a", "10.9.0.2"),
+        ("b", "10.9.0.3"),
+        ("down", "10.9.0.4"),
+        ("stale", "10.9.0.5"),
+    ]
+    .into_iter()
+    .map(|(id, ip)| (id.to_string(), ip.parse().unwrap()))
+    .collect();
+    let mut hub = Hub::new(
+        config,
+        tokens.clone(),
+        Resolver::Static { ips, run_urls },
+        Db::memory(),
+    );
     hub.timeout = timeout;
     let hub = Arc::new(hub);
     let addr = serve(crate::hub::router(hub.clone())).await;
-    Team { hub, hub_url: format!("http://{addr}"), user_token: tokens["user"].clone(), dir }
+    Team {
+        hub,
+        hub_url: format!("http://{addr}"),
+        user_token: tokens["user"].clone(),
+        dir,
+    }
 }
 
 impl Team {
@@ -106,25 +140,54 @@ impl Team {
         Client::new(&self.hub_url, &self.user_token)
     }
 
-    async fn send_as(&self, from: &str, to: &str, text: &str, hops: u32) -> Result<String, HubError> {
-        let principal = if from == "user" { Principal::User } else { Principal::Agent(from.into()) };
-        self.hub.send(&principal, SendRequest { to: to.into(), text: text.into(), hops }).await
+    async fn send_as(
+        &self,
+        from: &str,
+        to: &str,
+        text: &str,
+        hops: u32,
+    ) -> Result<String, HubError> {
+        let principal = if from == "user" {
+            Principal::User
+        } else {
+            Principal::Agent(from.into())
+        };
+        self.hub
+            .send(
+                &principal,
+                SendRequest {
+                    to: to.into(),
+                    text: text.into(),
+                    hops,
+                },
+            )
+            .await
     }
 
     /// Waits for the process the fake harness recorded in `sleep.pid` to be gone.
     async fn sleep_killed(&self) {
-        let pid: i32 = std::fs::read_to_string(self.dir.join("sleep.pid")).unwrap().trim().parse().unwrap();
+        let pid: i32 = std::fs::read_to_string(self.dir.join("sleep.pid"))
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
         let gone = async {
             while nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), None).is_ok() {
                 tokio::time::sleep(Duration::from_millis(50)).await;
             }
         };
-        tokio::time::timeout(Duration::from_secs(3), gone).await.expect("the session's process was killed");
+        tokio::time::timeout(Duration::from_secs(3), gone)
+            .await
+            .expect("the session's process was killed");
     }
 
     /// Sessions the fake harness started, in order (all agents share it).
     fn starts(&self) -> Vec<String> {
-        std::fs::read_to_string(self.dir.join("starts")).unwrap_or_default().lines().map(str::to_string).collect()
+        std::fs::read_to_string(self.dir.join("starts"))
+            .unwrap_or_default()
+            .lines()
+            .map(str::to_string)
+            .collect()
     }
 }
 
@@ -137,13 +200,31 @@ impl Drop for Team {
 #[tokio::test(flavor = "multi_thread")]
 async fn you_message_an_agent_and_get_its_answer() {
     let t = team("pong", Duration::from_secs(10)).await;
-    let reply = t.user().send("a", "Reply with exactly: pong", 1).await.unwrap();
-    assert_eq!(reply, "[Rin] Message from user (User). | hops=1 | Reply with exactly: pong");
+    let reply = t
+        .user()
+        .send("a", "Reply with exactly: pong", 1)
+        .await
+        .unwrap();
+    assert_eq!(
+        reply,
+        "[Rin] Message from user (User). | hops=1 | Reply with exactly: pong"
+    );
 
     let log = t.user().log(None, 0).await.unwrap();
     assert_eq!(log.len(), 2);
-    assert_eq!((log[0].kind, log[0].from.as_deref(), log[0].to.as_deref(), log[0].hops), (Kind::Message, Some("user"), Some("a"), Some(1)));
-    assert_eq!((log[1].kind, log[1].from.as_deref(), log[1].to.as_deref()), (Kind::Reply, Some("a"), Some("user")));
+    assert_eq!(
+        (
+            log[0].kind,
+            log[0].from.as_deref(),
+            log[0].to.as_deref(),
+            log[0].hops
+        ),
+        (Kind::Message, Some("user"), Some("a"), Some(1))
+    );
+    assert_eq!(
+        (log[1].kind, log[1].from.as_deref(), log[1].to.as_deref()),
+        (Kind::Reply, Some("a"), Some("user"))
+    );
     assert_eq!(log[1].msg, Some(log[0].id));
 }
 
@@ -165,13 +246,30 @@ async fn agents_send_with_their_true_identity_and_hops() {
 #[tokio::test(flavor = "multi_thread")]
 async fn rejects_self_unknown_and_unreachable_receivers() {
     let t = team("reject", Duration::from_secs(10)).await;
-    assert!(matches!(t.send_as("b", "b", "hi", 1).await, Err(HubError::ToSelf)));
-    assert!(t.send_as("b", "nobody", "hi", 1).await.unwrap_err().to_string().starts_with("unknown agent"));
+    assert!(matches!(
+        t.send_as("b", "b", "hi", 1).await,
+        Err(HubError::ToSelf)
+    ));
+    assert!(
+        t.send_as("b", "nobody", "hi", 1)
+            .await
+            .unwrap_err()
+            .to_string()
+            .starts_with("unknown agent")
+    );
     let err = t.user().send("down", "hi", 1).await.unwrap_err();
     assert!(err.to_string().starts_with("receiver down"), "{err}");
     let err = t.user().send("stale", "hi", 1).await.unwrap_err();
-    assert!(err.to_string().starts_with("session failed: stale refused the hub (not authorized: wrong token)"), "{err}");
-    assert_eq!(t.hub.agents(&Principal::User).agents[2].sessions, 0, "the failed message gave its slot back");
+    assert!(
+        err.to_string()
+            .starts_with("session failed: stale refused the hub (not authorized: wrong token)"),
+        "{err}"
+    );
+    assert_eq!(
+        t.hub.agents(&Principal::User).agents[2].sessions,
+        0,
+        "the failed message gave its slot back"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -179,16 +277,28 @@ async fn failed_sessions_report_their_last_lines() {
     let t = team("fail", Duration::from_secs(10)).await;
     let err = t.user().send("a", "fail", 1).await.unwrap_err().to_string();
     assert!(err.starts_with("session failed"), "{err}");
-    assert!(err.contains("boom: no such model") && err.contains("working"), "{err}");
+    assert!(
+        err.contains("boom: no such model") && err.contains("working"),
+        "{err}"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn timeout_kills_the_session() {
     let t = team("timeout", Duration::from_secs(1)).await;
     let started = Instant::now();
-    let err = t.user().send("b", "sleep 30", 1).await.unwrap_err().to_string();
+    let err = t
+        .user()
+        .send("b", "sleep 30", 1)
+        .await
+        .unwrap_err()
+        .to_string();
     assert!(err.starts_with("timeout"), "{err}");
-    assert!(started.elapsed() < Duration::from_secs(5), "took {:?}", started.elapsed());
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "took {:?}",
+        started.elapsed()
+    );
 
     // The session's child process is gone, and the slot is free again.
     t.sleep_killed().await;
@@ -215,9 +325,15 @@ async fn a_sender_that_stops_waiting_ends_the_session() {
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
     };
-    tokio::time::timeout(Duration::from_secs(3), freed).await.expect("the slot was freed");
+    tokio::time::timeout(Duration::from_secs(3), freed)
+        .await
+        .expect("the slot was freed");
     let log = t.user().log(None, 0).await.unwrap();
-    assert!(log.last().unwrap().text.starts_with("cancelled"), "{:?}", log.last());
+    assert!(
+        log.last().unwrap().text.starts_with("cancelled"),
+        "{:?}",
+        log.last()
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -226,7 +342,10 @@ async fn leftovers_of_a_finished_session_are_stopped() {
     let started = Instant::now();
     let reply = t.user().send("b", "bg", 1).await.unwrap();
     assert!(reply.ends_with("| bg"), "{reply}");
-    assert!(started.elapsed() < Duration::from_secs(5), "a background process held up the reply");
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "a background process held up the reply"
+    );
     t.sleep_killed().await;
 }
 
@@ -236,16 +355,28 @@ async fn full_agents_queue_first_come_first_served() {
     let mut sends = Vec::new();
     for n in 1..=3 {
         let t = t.clone();
-        sends.push(tokio::spawn(async move { t.user().send("a", &format!("sleep 0.4 n{n}"), 1).await }));
+        sends.push(tokio::spawn(async move {
+            t.user().send("a", &format!("sleep 0.4 n{n}"), 1).await
+        }));
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     let usage = &t.hub.agents(&Principal::User).agents[0];
-    assert_eq!((usage.sessions, usage.max_sessions, usage.queued), (1, 1, 2));
+    assert_eq!(
+        (usage.sessions, usage.max_sessions, usage.queued),
+        (1, 1, 2)
+    );
     for (n, send) in sends.into_iter().enumerate() {
         let reply = send.await.unwrap().unwrap();
         assert!(reply.ends_with(&format!("sleep 0.4 n{}", n + 1)), "{reply}");
     }
-    assert_eq!(t.starts(), ["start sleep 0.4 n1", "start sleep 0.4 n2", "start sleep 0.4 n3"]);
+    assert_eq!(
+        t.starts(),
+        [
+            "start sleep 0.4 n1",
+            "start sleep 0.4 n2",
+            "start sleep 0.4 n3"
+        ]
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -259,10 +390,29 @@ async fn queued_messages_time_out_without_starting() {
     };
     tokio::time::sleep(Duration::from_millis(30)).await;
     let started = Instant::now();
-    let second = t.user().send("a", "never runs", 1).await.unwrap_err().to_string();
-    assert!(second.starts_with("timeout: a was busy") && second.ends_with("not started"), "{second}");
-    assert!(started.elapsed() < Duration::from_millis(1500), "{:?} after its own send", started.elapsed());
-    assert!(first.await.unwrap().unwrap_err().to_string().starts_with("timeout"));
+    let second = t
+        .user()
+        .send("a", "never runs", 1)
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        second.starts_with("timeout: a was busy") && second.ends_with("not started"),
+        "{second}"
+    );
+    assert!(
+        started.elapsed() < Duration::from_millis(1500),
+        "{:?} after its own send",
+        started.elapsed()
+    );
+    assert!(
+        first
+            .await
+            .unwrap()
+            .unwrap_err()
+            .to_string()
+            .starts_with("timeout")
+    );
     assert_eq!(t.starts(), ["start sleep 30"]);
     let usage = &t.hub.agents(&Principal::User).agents[0];
     assert_eq!((usage.sessions, usage.queued), (0, 0));
@@ -284,11 +434,26 @@ async fn queued_messages_with_time_left_run_when_a_slot_frees() {
 #[tokio::test(flavor = "multi_thread")]
 async fn too_long_messages_are_refused_before_sending() {
     let t = team("too-big", Duration::from_secs(10)).await;
-    let err = t.user().send("b", &"x".repeat(3 << 20), 1).await.unwrap_err().to_string();
-    assert!(err.starts_with("message too long: 3073 KiB as JSON, the hub takes at most 120 KiB"), "{err}");
-    assert!(t.user().log(None, 0).await.unwrap().is_empty(), "nothing reached the hub");
+    let err = t
+        .user()
+        .send("b", &"x".repeat(3 << 20), 1)
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.starts_with("message too long: 3073 KiB as JSON, the hub takes at most 120 KiB"),
+        "{err}"
+    );
+    assert!(
+        t.user().log(None, 0).await.unwrap().is_empty(),
+        "nothing reached the hub"
+    );
     // Just under the limit gets all the way through the harness's command line.
-    let reply = t.user().send("b", &"x".repeat(crate::proto::MAX_BODY - 100), 1).await.unwrap();
+    let reply = t
+        .user()
+        .send("b", &"x".repeat(crate::proto::MAX_BODY - 100), 1)
+        .await
+        .unwrap();
     assert!(reply.contains("| xxx"), "{}", &reply[..80]);
 }
 
@@ -296,9 +461,21 @@ async fn too_long_messages_are_refused_before_sending() {
 async fn plain_text_errors_from_the_hub_are_shown() {
     // Errors raised before the hub's handlers (here: a bad query string) aren't JSON.
     let t = team("plain", Duration::from_secs(10)).await;
-    let response = reqwest::Client::new().get(format!("{}/log?after=abc", t.hub_url)).bearer_auth(&t.user_token).send().await;
-    let err = t.user().read::<serde_json::Value>(response).await.unwrap_err().to_string();
-    assert!(err.starts_with("the hub answered 400 Bad Request: "), "{err}");
+    let response = reqwest::Client::new()
+        .get(format!("{}/log?after=abc", t.hub_url))
+        .bearer_auth(&t.user_token)
+        .send()
+        .await;
+    let err = t
+        .user()
+        .read::<serde_json::Value>(response)
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.starts_with("the hub answered 400 Bad Request: "),
+        "{err}"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -306,10 +483,28 @@ async fn tokens_are_checked() {
     let t = team("auth", Duration::from_secs(10)).await;
     // No token, garbage, and an agent's token from outside its container.
     for token in ["", "garbage", "token-a-auth"] {
-        let err = Client::new(&t.hub_url, token).send("b", "hi", 1).await.unwrap_err().to_string();
+        let err = Client::new(&t.hub_url, token)
+            .send("b", "hi", 1)
+            .await
+            .unwrap_err()
+            .to_string();
         assert_eq!(err, "not authorized");
-        assert_eq!(Client::new(&t.hub_url, token).agents().await.unwrap_err().to_string(), "not authorized");
-        assert_eq!(Client::new(&t.hub_url, token).log(None, 0).await.unwrap_err().to_string(), "not authorized");
+        assert_eq!(
+            Client::new(&t.hub_url, token)
+                .agents()
+                .await
+                .unwrap_err()
+                .to_string(),
+            "not authorized"
+        );
+        assert_eq!(
+            Client::new(&t.hub_url, token)
+                .log(None, 0)
+                .await
+                .unwrap_err()
+                .to_string(),
+            "not authorized"
+        );
     }
     // Unauthorized attempts are not logged.
     assert!(t.user().log(None, 0).await.unwrap().is_empty());
@@ -320,12 +515,25 @@ async fn runtime_rejects_anyone_but_the_hub() {
     let dir = std::env::temp_dir().join(format!("rin-e2e-runtime-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     // The "hub" is some other host, so even the right token from here is refused.
-    let runtime = Runtime::new(Harness::ClaudeCode, "m", Duration::from_secs(60), "tok", "http://192.0.2.1:7000", &dir);
-    let addr = serve(crate::runtime::router(Arc::new(runtime))).await;
+    let runtime = Runtime::new(
+        Harness::ClaudeCode,
+        "m",
+        Duration::from_secs(60),
+        "tok",
+        "http://192.0.2.1:7000",
+        &dir,
+    );
+    let addr = serve(crate::agent_runtime::router(Arc::new(runtime))).await;
     let http = reqwest::Client::new();
     let body = json!({ "from": "a", "fromLabel": "A", "text": "hi", "hops": 1, "timeoutMs": 1000 });
     for (token, why) in [("tok", "not from the hub"), ("wrong", "wrong token")] {
-        let response = http.post(format!("http://{addr}/run")).bearer_auth(token).json(&body).send().await.unwrap();
+        let response = http
+            .post(format!("http://{addr}/run"))
+            .bearer_auth(token)
+            .json(&body)
+            .send()
+            .await
+            .unwrap();
         assert_eq!(response.status(), 401);
         let body: serde_json::Value = response.json().await.unwrap();
         assert_eq!(body["error"], format!("not authorized: {why}"));
@@ -337,8 +545,16 @@ async fn runtime_rejects_anyone_but_the_hub() {
 async fn list_agents_marks_the_caller() {
     let t = team("list", Duration::from_secs(10)).await;
     let listed = t.hub.agents(&Principal::Agent("b".into()));
-    let you: Vec<_> = listed.agents.iter().filter(|a| a.you).map(|a| a.id.as_str()).collect();
+    let you: Vec<_> = listed
+        .agents
+        .iter()
+        .filter(|a| a.you)
+        .map(|a| a.id.as_str())
+        .collect();
     assert_eq!(you, ["b"]);
     let text = crate::display::agents(&listed);
-    assert!(text.contains("Agent b") && text.lines().nth(2).unwrap().ends_with("you"), "{text}");
+    assert!(
+        text.contains("Agent b") && text.lines().nth(2).unwrap().ends_with("you"),
+        "{text}"
+    );
 }

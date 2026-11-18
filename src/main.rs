@@ -2,10 +2,9 @@
 
 cfg_select! {
     feature = "host" => {
-        mod cli;
+        mod host_cli;
         mod compose;
         mod files;
-        mod generate;
         mod yaml;
         mod team;
 
@@ -22,7 +21,7 @@ cfg_select! {
 cfg_select! {
     feature = "agent" => {
         mod mcp;
-        mod runtime;
+        mod agent_runtime;
     }
 }
 
@@ -43,11 +42,10 @@ mod client;
 mod config;
 mod display;
 mod proto;
+mod shared;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-
-use client::{Client, current_hops};
 
 #[derive(Parser)]
 #[command(
@@ -142,21 +140,6 @@ enum AgentCmd {
     Mcp,
 }
 
-/// Inside an agent container `rin` speaks as that agent; on your machine, as you.
-#[cfg_attr(not(feature = "host"), allow(unused_variables))]
-fn sender(team: Option<&str>) -> Result<(Client, u32)> {
-    if let Some(client) = Client::from_agent_env() {
-        return Ok((client, current_hops() + 1));
-    }
-    #[cfg(feature = "host")]
-    {
-        let team = team::Team::resolve(team)?;
-        Ok((cli::client(&team)?, 1))
-    }
-    #[cfg(not(feature = "host"))]
-    anyhow::bail!("RIN_TOKEN is not set: run this inside an agent container")
-}
-
 async fn run(cli: Cli) -> Result<()> {
     #[cfg(feature = "host")]
     let team = || team::Team::resolve(cli.team.as_deref());
@@ -164,32 +147,19 @@ async fn run(cli: Cli) -> Result<()> {
         #[cfg(feature = "host")]
         Cmd::Host(cmd) => match cmd {
             HostCmd::Generate { instructions, file } => {
-                // RIN_GIT_REV builds the images from another Rin revision (e.g. refs/heads/<branch>)
-                // to try unreleased changes; releases build from the `v<version>` tag.
-                let git_rev = std::env::var("RIN_GIT_REV")
-                    .unwrap_or_else(|_| format!("v{}", config::VERSION));
-                let generated =
-                    generate::generate(&file, &instructions, &team::rin_home()?, &git_rev)?;
-                for warning in &generated.warnings {
-                    eprintln!("warning: {warning}");
-                }
-                println!(
-                    "team {} written to {} (now the current team)",
-                    generated.team.name,
-                    generated.team.dir.display()
-                );
+                host_cli::generate_config(file, instructions)?
             }
-            HostCmd::Use { name } => cli::use_team(&name)?,
+            HostCmd::Use { name } => host_cli::use_team(&name)?,
 
-            HostCmd::Up => cli::up(&team()?)?,
+            HostCmd::Up => host_cli::up(&team()?)?,
 
-            HostCmd::Down => cli::down(&team()?)?,
+            HostCmd::Down => host_cli::down(&team()?)?,
 
-            HostCmd::Shell { id } => cli::shell(&team()?, &id)?,
+            HostCmd::Shell { id } => host_cli::shell(&team()?, &id)?,
 
-            HostCmd::Status => cli::status(&team()?).await?,
+            HostCmd::Status => host_cli::status(&team()?).await?,
 
-            HostCmd::Log { follow, id } => cli::log(&team()?, follow, id.as_deref()).await?,
+            HostCmd::Log { follow, id } => host_cli::log(&team()?, follow, id.as_deref()).await?,
         },
 
         #[cfg(feature = "hub")]
@@ -199,18 +169,12 @@ async fn run(cli: Cli) -> Result<()> {
 
         #[cfg(feature = "agent")]
         Cmd::Agent(cmd) => match cmd {
-            AgentCmd::Runtime => runtime::main().await?,
+            AgentCmd::Runtime => agent_runtime::main().await?,
             AgentCmd::Mcp => mcp::main().await?,
         },
 
-        Cmd::Send { to, text } => {
-            let (client, hops) = sender(cli.team.as_deref())?;
-            println!("{}", client.send(&to, &text.join(" "), hops).await?);
-        }
-        Cmd::Agents => {
-            let (client, _) = sender(cli.team.as_deref())?;
-            print!("{}", display::agents(&client.agents().await?));
-        }
+        Cmd::Send { to, text } => shared::cmd::send_message(cli.team.as_deref(), to, &text).await?,
+        Cmd::Agents => shared::cmd::show_agents(cli.team.as_deref()).await?,
     }
     Ok(())
 }

@@ -62,10 +62,15 @@ pub enum HubError {
     BadRequest(String),
     UnknownAgent(String),
     ToSelf,
-    HopLimit { hops: u32, max: u32 },
+    HopLimit {
+        hops: u32,
+        max: u32,
+    },
     /// Why the message ran out of time; starts with `timeout:`.
     Timeout(String),
-    ReceiverDown { to: String },
+    ReceiverDown {
+        to: String,
+    },
     /// An error reported by the receiver's runtime (`session failed: …`).
     Session(String),
 }
@@ -78,7 +83,10 @@ impl std::fmt::Display for HubError {
             HubError::UnknownAgent(id) => write!(f, "unknown agent: {id:?}"),
             HubError::ToSelf => write!(f, "rejected: an agent cannot send a message to itself"),
             HubError::HopLimit { hops, max } => {
-                write!(f, "hop limit reached: this message would be hop {hops}, maxHops is {max}")
+                write!(
+                    f,
+                    "hop limit reached: this message would be hop {hops}, maxHops is {max}"
+                )
             }
             HubError::Timeout(why) => write!(f, "{why}"),
             HubError::ReceiverDown { to } => write!(f, "receiver down: cannot reach {to}"),
@@ -114,7 +122,12 @@ impl Hub {
                 principals.insert(token, Principal::Agent(id));
             }
         }
-        let sched = Sched::new(config.agents.iter().map(|a| (a.id.as_str(), a.max_sessions as usize)));
+        let sched = Sched::new(
+            config
+                .agents
+                .iter()
+                .map(|a| (a.id.as_str(), a.max_sessions as usize)),
+        );
         let mut containers = agent_ids.clone();
         if config.uses_api_keys() {
             containers.push("bifrost".to_string());
@@ -137,25 +150,50 @@ impl Hub {
         self.sched.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    pub async fn authenticate(&self, headers: &HeaderMap, peer: IpAddr) -> Result<Principal, HubError> {
-        let authorization = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok());
-        auth::authenticate(&self.resolver, &self.principals, &self.containers, authorization, peer)
-            .await
-            .ok_or(HubError::NotAuthorized)
+    pub async fn authenticate(
+        &self,
+        headers: &HeaderMap,
+        peer: IpAddr,
+    ) -> Result<Principal, HubError> {
+        let authorization = headers
+            .get(header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok());
+        auth::authenticate(
+            &self.resolver,
+            &self.principals,
+            &self.containers,
+            authorization,
+            peer,
+        )
+        .await
+        .ok_or(HubError::NotAuthorized)
     }
 
     /// Sends one message from `from` and waits for the receiver's final answer.
     /// The message and its outcome are logged.
     pub async fn send(&self, from: &Principal, request: SendRequest) -> Result<String, HubError> {
         let deadline = Instant::now() + self.timeout;
-        let msg = self.db.message(from.id(), &request.to, request.hops, &request.text);
-        let mut outcome = Outcome { hub: self, msg, from: from.id(), to: &request.to, logged: false };
+        let msg = self
+            .db
+            .message(from.id(), &request.to, request.hops, &request.text);
+        let mut outcome = Outcome {
+            hub: self,
+            msg,
+            from: from.id(),
+            to: &request.to,
+            logged: false,
+        };
         let result = self.deliver(from.id(), &request, deadline).await;
         outcome.log(&result);
         result
     }
 
-    async fn deliver(&self, from: &str, request: &SendRequest, deadline: Instant) -> Result<String, HubError> {
+    async fn deliver(
+        &self,
+        from: &str,
+        request: &SendRequest,
+        deadline: Instant,
+    ) -> Result<String, HubError> {
         let to = request.to.as_str();
         if self.config.agent(to).is_none() {
             return Err(HubError::UnknownAgent(to.to_string()));
@@ -168,7 +206,10 @@ impl Hub {
         }
         let max = self.config.messaging.max_hops;
         if request.hops > max {
-            return Err(HubError::HopLimit { hops: request.hops, max });
+            return Err(HubError::HopLimit {
+                hops: request.hops,
+                max,
+            });
         }
 
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
@@ -177,7 +218,10 @@ impl Hub {
         if let Admit::Queued(handover) = admit {
             self.check_deadlocks();
             // Either way the message never starts; `_slot` passes the slot on.
-            if !matches!(tokio::time::timeout_at(deadline, handover).await, Ok(Ok(()))) {
+            if !matches!(
+                tokio::time::timeout_at(deadline, handover).await,
+                Ok(Ok(()))
+            ) {
                 return Err(HubError::Timeout(format!(
                     "timeout: {to} was busy for the whole {}; the message never started",
                     self.timeout_text()
@@ -200,11 +244,19 @@ impl Hub {
     }
 
     fn timed_out(&self, to: &str) -> HubError {
-        HubError::Timeout(format!("timeout: no reply from {to} within {}", self.timeout_text()))
+        HubError::Timeout(format!(
+            "timeout: no reply from {to} within {}",
+            self.timeout_text()
+        ))
     }
 
     /// Asks the receiver's runtime to run the message as a fresh session.
-    async fn run(&self, from: &str, request: &SendRequest, deadline: Instant) -> Result<String, HubError> {
+    async fn run(
+        &self,
+        from: &str,
+        request: &SendRequest,
+        deadline: Instant,
+    ) -> Result<String, HubError> {
         let to = request.to.as_str();
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
@@ -243,16 +295,34 @@ impl Hub {
             Err(_) => return Err(HubError::ReceiverDown { to: to.to_string() }),
         };
         match (status, body) {
-            (StatusCode::OK, RunResponse { reply: Some(reply), .. }) => Ok(reply),
+            (
+                StatusCode::OK,
+                RunResponse {
+                    reply: Some(reply), ..
+                },
+            ) => Ok(reply),
             (StatusCode::GATEWAY_TIMEOUT, _) => Err(self.timed_out(to)),
             // The runtime didn't take the hub's call: say why, and how to fix a stale token.
             (StatusCode::UNAUTHORIZED, RunResponse { error, .. }) => {
                 let why = error.unwrap_or_else(|| "not authorized".into());
-                let hint = if why.contains("wrong token") { "; `rin up` restarts it with the current tokens.json" } else { "" };
-                Err(HubError::Session(format!("session failed: {to} refused the hub ({why}){hint}")))
+                let hint = if why.contains("wrong token") {
+                    "; `rin up` restarts it with the current tokens.json"
+                } else {
+                    ""
+                };
+                Err(HubError::Session(format!(
+                    "session failed: {to} refused the hub ({why}){hint}"
+                )))
             }
-            (_, RunResponse { error: Some(error), .. }) => Err(HubError::Session(error)),
-            (status, _) => Err(HubError::Session(format!("session failed: {to} answered {status}"))),
+            (
+                _,
+                RunResponse {
+                    error: Some(error), ..
+                },
+            ) => Err(HubError::Session(error)),
+            (status, _) => Err(HubError::Session(format!(
+                "session failed: {to} answered {status}"
+            ))),
         }
     }
 
@@ -286,7 +356,11 @@ impl Hub {
                 }
             })
             .collect();
-        let warnings = sched.deadlocks(std::time::Instant::now()).iter().map(ToString::to_string).collect();
+        let warnings = sched
+            .deadlocks(std::time::Instant::now())
+            .iter()
+            .map(ToString::to_string)
+            .collect();
         AgentsResponse { agents, warnings }
     }
 }
@@ -304,7 +378,10 @@ impl Outcome<'_> {
     fn log(&mut self, result: &Result<String, HubError>) {
         match result {
             Ok(reply) => self.hub.db.reply(self.msg, self.to, self.from, reply),
-            Err(e) => self.hub.db.error(self.msg, self.to, self.from, &e.to_string()),
+            Err(e) => self
+                .hub
+                .db
+                .error(self.msg, self.to, self.from, &e.to_string()),
         }
         self.logged = true;
     }
@@ -313,7 +390,12 @@ impl Outcome<'_> {
 impl Drop for Outcome<'_> {
     fn drop(&mut self) {
         if !self.logged {
-            self.hub.db.error(self.msg, self.to, self.from, "cancelled: the sender stopped waiting");
+            self.hub.db.error(
+                self.msg,
+                self.to,
+                self.from,
+                "cancelled: the sender stopped waiting",
+            );
         }
     }
 }
@@ -391,7 +473,11 @@ async fn get_log(
     }
     match hub.db.events(query.agent.as_deref(), query.after) {
         Ok(events) => axum::Json(json!({ "events": events })).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(json!({ "error": e.to_string() }))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(json!({ "error": e.to_string() })),
+        )
+            .into_response(),
     }
 }
 
@@ -406,12 +492,15 @@ pub async fn main() -> Result<()> {
     let db_path = env_or("RIN_DB", "/var/lib/rin/hub.db");
     let listen = env_or("RIN_LISTEN", "0.0.0.0:7000");
 
-    let text = std::fs::read_to_string(&config_path).with_context(|| format!("cannot read {config_path}"))?;
-    let value = serde_json::from_str(&text).with_context(|| format!("{config_path} is not JSON"))?;
+    let text = std::fs::read_to_string(&config_path)
+        .with_context(|| format!("cannot read {config_path}"))?;
+    let value =
+        serde_json::from_str(&text).with_context(|| format!("{config_path} is not JSON"))?;
     let config = crate::config::from_value(value).with_context(|| config_path.clone())?;
-    let text = std::fs::read_to_string(&tokens_path).with_context(|| format!("cannot read {tokens_path}"))?;
-    let tokens: HashMap<String, String> =
-        serde_json::from_str(&text).with_context(|| format!("{tokens_path} is not a tokens file"))?;
+    let text = std::fs::read_to_string(&tokens_path)
+        .with_context(|| format!("cannot read {tokens_path}"))?;
+    let tokens: HashMap<String, String> = serde_json::from_str(&text)
+        .with_context(|| format!("{tokens_path} is not a tokens file"))?;
     let db = Db::open(std::path::Path::new(&db_path))?;
 
     let hub = Arc::new(Hub::new(config, tokens, Resolver::dns(), db));
@@ -435,7 +524,9 @@ pub async fn main() -> Result<()> {
         }
     });
 
-    let listener = tokio::net::TcpListener::bind(&listen).await.with_context(|| format!("cannot listen on {listen}"))?;
+    let listener = tokio::net::TcpListener::bind(&listen)
+        .await
+        .with_context(|| format!("cannot listen on {listen}"))?;
     eprintln!("rin hub: team {} listening on {listen}", hub.config.name);
     let app = router(hub).into_make_service_with_connect_info::<SocketAddr>();
     tokio::select! {

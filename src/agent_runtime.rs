@@ -49,18 +49,29 @@ pub enum SessionError {
 
 /// The prompt a delegated session starts with.
 pub fn prompt(from: &str, from_label: &str, text: &str) -> String {
-    format!("[Rin] Message from {from} ({from_label}).\nYour final answer will be sent back to them as the reply.\n\n{text}")
+    format!(
+        "[Rin] Message from {from} ({from_label}).\nYour final answer will be sent back to them as the reply.\n\n{text}"
+    )
 }
 
 /// The host in `RIN_HUB_URL`, without IPv6 brackets.
 fn host_of(url: &str) -> String {
     let parsed = reqwest::Url::parse(url).ok();
     let host = parsed.as_ref().and_then(|u| u.host_str()).unwrap_or(url);
-    host.trim_start_matches('[').trim_end_matches(']').to_string()
+    host.trim_start_matches('[')
+        .trim_end_matches(']')
+        .to_string()
 }
 
 impl Runtime {
-    pub fn new(harness: Harness, model: &str, timeout: Duration, token: &str, hub_url: &str, home: &Path) -> Runtime {
+    pub fn new(
+        harness: Harness,
+        model: &str,
+        timeout: Duration,
+        token: &str,
+        hub_url: &str,
+        home: &Path,
+    ) -> Runtime {
         Runtime {
             harness,
             model: model.to_string(),
@@ -77,7 +88,10 @@ impl Runtime {
     /// `Err` says which check failed.
     async fn authorized(&self, headers: &HeaderMap, peer: IpAddr) -> Result<(), &'static str> {
         let expected = format!("Bearer {}", self.token);
-        let given = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).unwrap_or("");
+        let given = headers
+            .get(header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
         if self.token.is_empty() || given != expected {
             return Err("wrong token");
         }
@@ -85,18 +99,33 @@ impl Runtime {
         let from_hub = tokio::net::lookup_host((self.hub_host.as_str(), 0))
             .await
             .is_ok_and(|mut addrs| addrs.any(|a| a.ip().to_canonical() == peer));
-        if from_hub { Ok(()) } else { Err("not from the hub") }
+        if from_hub {
+            Ok(())
+        } else {
+            Err("not from the hub")
+        }
     }
 
     /// Runs one message as a fresh headless session and returns its final answer.
     /// The session and everything it started are killed when it ends, when
     /// `limit` runs out, or when the hub stops waiting.
-    pub async fn run_session(&self, prompt: &str, hops: u32, limit: Duration) -> Result<String, SessionError> {
-        let marker = format!("{}-{}", std::process::id(), self.sessions.fetch_add(1, Ordering::Relaxed));
+    pub async fn run_session(
+        &self,
+        prompt: &str,
+        hops: u32,
+        limit: Duration,
+    ) -> Result<String, SessionError> {
+        let marker = format!(
+            "{}-{}",
+            std::process::id(),
+            self.sessions.fetch_add(1, Ordering::Relaxed)
+        );
         let scratch = self.home.join(".cache/rin");
         let work = self.home.join("work");
         for dir in [&scratch, &work] {
-            std::fs::create_dir_all(dir).map_err(|e| SessionError::Failed(format!("cannot create {}: {e}", dir.display())))?;
+            std::fs::create_dir_all(dir).map_err(|e| {
+                SessionError::Failed(format!("cannot create {}: {e}", dir.display()))
+            })?;
         }
         // Harnesses take the prompt as one argument; Linux refuses longer ones.
         if prompt.len() > MAX_ARG_LEN {
@@ -108,11 +137,15 @@ impl Runtime {
         }
         let files = SessionFiles::new(&scratch, &marker);
         let invocation = harness::invocation(self.harness, &self.model, prompt, &files.answer);
-        let program = self.program.clone().unwrap_or_else(|| PathBuf::from(invocation.program));
+        let program = self
+            .program
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(invocation.program));
         // Output goes to files, not pipes: a background process the session
         // leaves behind can't hold them open and stall the reply.
         let create = |path: &Path| {
-            std::fs::File::create(path).map_err(|e| SessionError::Failed(format!("cannot create {}: {e}", path.display())))
+            std::fs::File::create(path)
+                .map_err(|e| SessionError::Failed(format!("cannot create {}: {e}", path.display())))
         };
         let mut command = tokio::process::Command::new(&program);
         command
@@ -125,10 +158,13 @@ impl Runtime {
             .stderr(create(&files.stderr)?)
             .process_group(0)
             .kill_on_drop(true);
-        let mut child = command
-            .spawn()
-            .map_err(|e| SessionError::Failed(format!("cannot start {}: {e}", program.display())))?;
-        let _kill = KillOnDrop { group: child.id(), marker };
+        let mut child = command.spawn().map_err(|e| {
+            SessionError::Failed(format!("cannot start {}: {e}", program.display()))
+        })?;
+        let _kill = KillOnDrop {
+            group: child.id(),
+            marker,
+        };
 
         let status = match tokio::time::timeout(limit, child.wait()).await {
             Err(_) => return Err(SessionError::Timeout(limit)),
@@ -139,7 +175,11 @@ impl Runtime {
         let stderr = files.read(&files.stderr);
         let tail = || last_lines(&format!("{stdout}\n{stderr}"), LAST_LINES);
         if !status.success() {
-            return Err(SessionError::Failed(format!("{} exited with {status}:\n{}", program.display(), tail())));
+            return Err(SessionError::Failed(format!(
+                "{} exited with {status}:\n{}",
+                program.display(),
+                tail()
+            )));
         }
         let answer = std::fs::read_to_string(&files.answer).ok();
         harness::answer(self.harness, &stdout, answer.as_deref())
@@ -157,11 +197,17 @@ struct SessionFiles {
 impl SessionFiles {
     fn new(dir: &Path, marker: &str) -> SessionFiles {
         let path = |what: &str| dir.join(format!("{marker}.{what}"));
-        SessionFiles { stdout: path("out"), stderr: path("err"), answer: path("answer") }
+        SessionFiles {
+            stdout: path("out"),
+            stderr: path("err"),
+            answer: path("answer"),
+        }
     }
 
     fn read(&self, path: &Path) -> String {
-        std::fs::read(path).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default()
+        std::fs::read(path)
+            .map(|b| String::from_utf8_lossy(&b).into_owned())
+            .unwrap_or_default()
     }
 }
 
@@ -210,11 +256,20 @@ impl Drop for KillOnDrop {
 #[cfg(target_os = "linux")]
 fn kill_marked(marker: &str) {
     let needle = format!("RIN_SESSION={marker}");
-    let Ok(entries) = std::fs::read_dir("/proc") else { return };
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return;
+    };
     for entry in entries.flatten() {
-        let Ok(pid) = entry.file_name().to_string_lossy().parse::<i32>() else { continue };
-        let Ok(environ) = std::fs::read(entry.path().join("environ")) else { continue };
-        if environ.split(|b| *b == 0).any(|var| var == needle.as_bytes()) {
+        let Ok(pid) = entry.file_name().to_string_lossy().parse::<i32>() else {
+            continue;
+        };
+        let Ok(environ) = std::fs::read(entry.path().join("environ")) else {
+            continue;
+        };
+        if environ
+            .split(|b| *b == 0)
+            .any(|var| var == needle.as_bytes())
+        {
             let _ = nix::sys::signal::kill(Pid::from_raw(pid), Signal::SIGKILL);
         }
     }
@@ -223,11 +278,21 @@ fn kill_marked(marker: &str) {
 pub fn router(runtime: Arc<Runtime>) -> Router {
     // A bit above the hub's limit: the hub adds the sender's name and label to the text.
     let limit = axum::extract::DefaultBodyLimit::max(crate::proto::MAX_BODY + (64 << 10));
-    Router::new().route("/run", post(post_run)).layer(limit).with_state(runtime)
+    Router::new()
+        .route("/run", post(post_run))
+        .layer(limit)
+        .with_state(runtime)
 }
 
 fn error(status: StatusCode, text: String) -> Response {
-    (status, axum::Json(RunResponse { reply: None, error: Some(text) })).into_response()
+    (
+        status,
+        axum::Json(RunResponse {
+            reply: None,
+            error: Some(text),
+        }),
+    )
+        .into_response()
 }
 
 async fn post_run(
@@ -246,11 +311,18 @@ async fn post_run(
     let limit = Duration::from_millis(request.timeout_ms).min(runtime.timeout);
     let prompt = prompt(&request.from, &request.from_label, &request.text);
     match runtime.run_session(&prompt, request.hops, limit).await {
-        Ok(reply) => axum::Json(RunResponse { reply: Some(reply), error: None }).into_response(),
-        Err(SessionError::Timeout(after)) => {
-            error(StatusCode::GATEWAY_TIMEOUT, format!("timeout: session killed after {}", format_duration(after)))
+        Ok(reply) => axum::Json(RunResponse {
+            reply: Some(reply),
+            error: None,
+        })
+        .into_response(),
+        Err(SessionError::Timeout(after)) => error(
+            StatusCode::GATEWAY_TIMEOUT,
+            format!("timeout: session killed after {}", format_duration(after)),
+        ),
+        Err(SessionError::Failed(why)) => {
+            error(StatusCode::BAD_GATEWAY, format!("session failed: {why}"))
         }
-        Err(SessionError::Failed(why)) => error(StatusCode::BAD_GATEWAY, format!("session failed: {why}")),
     }
 }
 
@@ -261,21 +333,30 @@ fn required(name: &str) -> Result<String> {
 /// Entry point of `rin runtime` in an agent container.
 pub async fn main() -> Result<()> {
     let harness_name = required("RIN_HARNESS")?;
-    let harness = Harness::parse(&harness_name).ok_or_else(|| anyhow!("unknown RIN_HARNESS {harness_name:?}"))?;
+    let harness = Harness::parse(&harness_name)
+        .ok_or_else(|| anyhow!("unknown RIN_HARNESS {harness_name:?}"))?;
     let model = required("RIN_MODEL")?;
     let timeout_text = std::env::var("RIN_TIMEOUT").unwrap_or_else(|_| "30m".into());
-    let timeout = parse_minutes(&timeout_text).ok_or_else(|| anyhow!("bad RIN_TIMEOUT {timeout_text:?}"))?;
+    let timeout =
+        parse_minutes(&timeout_text).ok_or_else(|| anyhow!("bad RIN_TIMEOUT {timeout_text:?}"))?;
     let token = required("RIN_TOKEN")?;
     if token.is_empty() {
         bail!("RIN_TOKEN is empty");
     }
     let hub_url = std::env::var("RIN_HUB_URL").unwrap_or_else(|_| "http://hub:7000".into());
     let home = PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| "/home/agent".into()));
-    let bifrost = std::env::var("RIN_BIFROST_URL").ok().filter(|u| !u.is_empty());
+    let bifrost = std::env::var("RIN_BIFROST_URL")
+        .ok()
+        .filter(|u| !u.is_empty());
 
     let written = settings::apply(
         &home,
-        &settings::Settings { harness, model: &model, timeout, bifrost: bifrost.as_deref() },
+        &settings::Settings {
+            harness,
+            model: &model,
+            timeout,
+            bifrost: bifrost.as_deref(),
+        },
     )
     .context("cannot write harness settings")?;
     for path in written {
@@ -283,9 +364,16 @@ pub async fn main() -> Result<()> {
     }
     std::fs::create_dir_all(home.join("work")).context("cannot create ~/work")?;
 
-    let runtime = Arc::new(Runtime::new(harness, &model, timeout, &token, &hub_url, &home));
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:7001").await.context("cannot listen on 7001")?;
-    eprintln!("rin runtime: {} on {model}, listening on 7001", harness.as_str());
+    let runtime = Arc::new(Runtime::new(
+        harness, &model, timeout, &token, &hub_url, &home,
+    ));
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:7001")
+        .await
+        .context("cannot listen on 7001")?;
+    eprintln!(
+        "rin runtime: {} on {model}, listening on 7001",
+        harness.as_str()
+    );
     let app = router(runtime).into_make_service_with_connect_info::<SocketAddr>();
     tokio::select! {
         result = axum::serve(listener, app) => result?,
@@ -309,11 +397,23 @@ mod tests {
     #[tokio::test]
     async fn refuses_prompts_longer_than_one_argument() {
         let home = std::env::temp_dir().join(format!("rin-runtime-argmax-{}", std::process::id()));
-        let runtime = Runtime::new(Harness::ClaudeCode, "m", Duration::from_secs(5), "tok", "http://hub:7000", &home);
-        let result = runtime.run_session(&"x".repeat(MAX_ARG_LEN + 1), 1, Duration::from_secs(5)).await;
+        let runtime = Runtime::new(
+            Harness::ClaudeCode,
+            "m",
+            Duration::from_secs(5),
+            "tok",
+            "http://hub:7000",
+            &home,
+        );
+        let result = runtime
+            .run_session(&"x".repeat(MAX_ARG_LEN + 1), 1, Duration::from_secs(5))
+            .await;
         let _ = std::fs::remove_dir_all(&home);
         match result {
-            Err(SessionError::Failed(why)) => assert!(why.starts_with("message too long for the harness's command line"), "{why}"),
+            Err(SessionError::Failed(why)) => assert!(
+                why.starts_with("message too long for the harness's command line"),
+                "{why}"
+            ),
             _ => panic!("a prompt over {MAX_ARG_LEN} bytes was run"),
         }
     }
