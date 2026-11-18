@@ -7,7 +7,7 @@ authors = ["Welt"]
 repository = "https://github.com/w3lt/rin"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-keywords = ["Rin Tohsaka", "cli", "AI agent", "Swarm"]
+keywords = ["rin-tohsaka", "cli", "ai-agent", "swarm"]
 
 [[bin]]
 name = "rin"
