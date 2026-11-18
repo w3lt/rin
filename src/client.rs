@@ -86,18 +86,12 @@ impl Client {
     }
 
     pub async fn log(&self, agent: Option<&str>, after: i64) -> Result<Vec<Event>> {
-        let mut url = format!("{}/log?after={after}", self.url);
-        if let Some(agent) = agent {
-            // Ids are [a-z0-9-], so they need no escaping; anything else is no agent.
-            if agent.is_empty()
-                || !agent
-                    .chars()
-                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-            {
-                bail!("unknown agent: {agent:?}");
-            }
-            url.push_str(&format!("&agent={agent}"));
-        }
+        let after = after.to_string();
+        let query = [("after", after.as_str())]
+            .into_iter()
+            .chain(agent.map(|agent| ("agent", agent)));
+        let url = reqwest::Url::parse_with_params(&format!("{}/log", self.url), query)
+            .map_err(|e| anyhow!("bad hub address {}: {e}", self.url))?;
         let response = self.http.get(url).bearer_auth(&self.token).send().await;
         #[derive(serde::Deserialize)]
         struct Log {
