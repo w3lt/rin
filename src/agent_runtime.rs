@@ -38,8 +38,13 @@ pub struct Runtime {
     home: PathBuf,
     /// Replaces the harness binary (tests use a fake harness).
     pub program: Option<PathBuf>,
-    sessions: AtomicU64,
 }
+
+/// Sessions started by this process. One counter for the whole process, not
+/// one per [`Runtime`]: a session's marker (`<pid>-<n>`) names the processes
+/// to kill when it ends, so two runtimes in one process (the tests) must
+/// never hand out the same one.
+static SESSIONS: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug)]
 pub enum SessionError {
@@ -80,7 +85,6 @@ impl Runtime {
             hub_host: host_of(hub_url),
             home: home.to_path_buf(),
             program: None,
-            sessions: AtomicU64::new(0),
         }
     }
 
@@ -118,7 +122,7 @@ impl Runtime {
         let marker = format!(
             "{}-{}",
             std::process::id(),
-            self.sessions.fetch_add(1, Ordering::Relaxed)
+            SESSIONS.fetch_add(1, Ordering::Relaxed)
         );
         let scratch = self.home.join(".cache/rin");
         let work = self.home.join("work");
