@@ -280,7 +280,10 @@ pub fn use_team(name: &str) -> Result<()> {
 pub fn generate_config(config_file: PathBuf, instructions: PathBuf) -> Result<()> {
     // RIN_GIT_REV builds the images from another Rin revision (e.g. refs/heads/<branch>)
     // to try unreleased changes; releases build from the `v<version>` tag.
-    let git_rev = std::env::var("RIN_GIT_REV").unwrap_or_else(|_| format!("v{}", config::VERSION));
+    let git_rev = std::env::var("RIN_GIT_REV")
+        .ok()
+        .filter(|rev| !rev.is_empty())
+        .unwrap_or_else(|| format!("v{}", config::VERSION));
     let generated = generate::generate(&config_file, &instructions, &team::rin_home()?, &git_rev)?;
     for warning in &generated.warnings {
         eprintln!("warning: {warning}");
