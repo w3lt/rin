@@ -1,6 +1,8 @@
 //! On every start, `rin runtime` writes three things into the harness's own
 //! config in the home volume: Rin's MCP server, its tool timeout, and the
 //! default model. Only those keys are touched; `rin.yml` wins on each start.
+//! Codex's `config.toml` is written out again as a whole when one of them
+//! changes: your other keys keep their values, but not comments or layout.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -26,9 +28,8 @@ pub fn tool_timeout(timeout: Duration) -> Duration {
     timeout + Duration::from_secs(60)
 }
 
-/// Variables `rin mcp` needs, for harnesses that don't pass their environment on.
-/// What Codex must pass to `rin mcp` (it strips the rest); `RIN_SESSION` lets
-/// the runtime kill the server with its session.
+/// What Codex must pass to `rin mcp` (it strips the rest of its environment);
+/// `RIN_SESSION` lets the runtime kill the server with its session.
 const MCP_ENV: [&str; 4] = ["RIN_TOKEN", "RIN_HUB_URL", "RIN_HOPS", "RIN_SESSION"];
 
 pub fn apply(home: &Path, settings: &Settings) -> Result<Vec<PathBuf>> {
