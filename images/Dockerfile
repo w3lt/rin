@@ -36,6 +36,9 @@ RUN install -d /var/lib/rin /etc/rin
 CMD ["rin", "hub"]
 
 # --- Node.js for the npm-installed harnesses -------------------------------------
+# Copied from the official image at a pinned version: no install script and no
+# extra apt repository, and `base` stays free of Node for the hub and Antigravity.
+# (That image can't be the base itself: its user `node` already has UID 1000.)
 FROM node:24.19.0-trixie-slim AS nodejs
 
 FROM base AS node
