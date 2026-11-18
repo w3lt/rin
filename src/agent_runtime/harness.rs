@@ -83,7 +83,10 @@ pub fn answer(harness: Harness, stdout: &str, answer_file: Option<&str>) -> Resu
             Some(text) if !text.is_empty() => Ok(text.to_string()),
             _ => Err("codex wrote no final message".to_string()),
         },
-        Harness::Pi | Harness::Antigravity => Ok(stdout.trim().to_string()),
+        Harness::Pi | Harness::Antigravity => match stdout.trim() {
+            "" => Err(format!("{} printed no answer", harness.as_str())),
+            text => Ok(text.to_string()),
+        },
     }
 }
 
@@ -116,6 +119,14 @@ mod tests {
         );
         assert!(answer(Harness::Codex, "", Some(" ")).is_err());
         assert!(answer(Harness::Codex, "", None).is_err());
+    }
+
+    #[test]
+    fn stdout_harnesses_need_an_answer() {
+        for harness in [Harness::Pi, Harness::Antigravity] {
+            assert_eq!(answer(harness, " pong\n", None), Ok("pong".into()));
+            assert!(answer(harness, " \n", None).is_err());
+        }
     }
 
     #[test]
