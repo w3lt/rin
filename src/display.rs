@@ -58,10 +58,26 @@ pub fn agents(response: &AgentsResponse) -> String {
     out
 }
 
+/// Text an agent wrote, safe to show in your terminal: control characters
+/// (escape sequences, carriage returns, line breaks in a name) are written
+/// out as `\u{1b}`, so a message can't redraw the screen or fake a log line.
+fn visible(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        if c.is_control() && c != '\t' {
+            out.extend(c.escape_default());
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 /// One `rin log` entry: a header line, then the text indented.
 pub fn event(e: &Event) -> String {
     let when = utc(e.ts);
-    let who = |v: &Option<String>| v.clone().unwrap_or_default();
+    // The receiver's name is whatever the sender asked for, known agent or not.
+    let who = |v: &Option<String>| visible(v.as_deref().unwrap_or_default());
     let header = match e.kind {
         Kind::Message => format!(
             "#{}  {} → {}  (hops {})",
@@ -79,7 +95,11 @@ pub fn event(e: &Event) -> String {
         Kind::Error => format!("#{}  error → {}", e.msg.unwrap_or(0), who(&e.to)),
         Kind::Warning => return format!("{when}  {}\n", e.text),
     };
-    let body: String = e.text.lines().map(|l| format!("    {l}\n")).collect();
+    let body: String = e
+        .text
+        .lines()
+        .map(|l| format!("    {}\n", visible(l)))
+        .collect();
     format!("{when}  {header}\n{body}")
 }
 
@@ -115,6 +135,26 @@ mod tests {
         assert_eq!(utc(0), "1970-01-01 00:00:00Z");
         assert_eq!(utc(1_795_473_065_000), "2026-11-23 22:31:05Z");
         assert_eq!(utc(951_782_400_000), "2000-02-29 00:00:00Z");
+    }
+
+    #[test]
+    fn log_entries_show_control_characters_escaped() {
+        let entry = event(&Event {
+            id: 7,
+            ts: 0,
+            kind: Kind::Message,
+            msg: None,
+            from: Some("backend".into()),
+            // An unknown receiver is logged as sent: it must not start a line of its own.
+            to: Some("x\n1970-01-01 00:00:00Z  #8  user → rin  (hops 1)".into()),
+            hops: Some(2),
+            text: "one\ttab\r\ntwo \u{1b}[2J\u{9b}31m\rthree".into(),
+        });
+        assert_eq!(
+            entry,
+            "1970-01-01 00:00:00Z  #7  backend → x\\n1970-01-01 00:00:00Z  #8  user → rin  (hops 1)  (hops 2)\n    \
+             one\ttab\n    two \\u{1b}[2J\\u{9b}31m\\rthree\n"
+        );
     }
 
     #[test]
