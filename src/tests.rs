@@ -314,7 +314,8 @@ async fn a_sender_that_stops_waiting_ends_the_session() {
         let t = t.clone();
         tokio::spawn(async move { t.user().send("b", "sleep 30", 1).await })
     };
-    while !t.dir.join("sleep.pid").exists() {
+    // Not just there: the shell creates the file before it writes the pid.
+    while std::fs::read_to_string(t.dir.join("sleep.pid")).map_or(true, |pid| pid.is_empty()) {
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
     assert_eq!(t.hub.agents(&Principal::User).agents[1].sessions, 1);
@@ -396,8 +397,10 @@ async fn queued_messages_time_out_without_starting() {
         .await
         .unwrap_err()
         .to_string();
+    // "was not started" if the slot came with moments left, "never started" if
+    // message 2's own timeout came first: which one is a race a few ms wide.
     assert!(
-        second.starts_with("timeout: a was busy") && second.ends_with("not started"),
+        second.starts_with("timeout: a was busy") && second.ends_with("started"),
         "{second}"
     );
     assert!(
