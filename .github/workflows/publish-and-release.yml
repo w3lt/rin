@@ -4,12 +4,6 @@ on:
   push:
     tags:
       - "v*.*.*"
-  # Build a tag that already exists, e.g. one pushed before this workflow did.
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Tag to build, e.g. v0.1.0
-        required: true
 
 permissions:
   contents: read
@@ -19,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  TAG: ${{ inputs.tag || github.ref_name }}
+  TAG: ${{ github.ref_name }}
   CRATE_NAME: tohsaka
 
 jobs:
@@ -29,6 +23,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
 
       - name: Install Rust stable
         run: |
@@ -42,12 +38,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Tag must look like vMAJOR.MINOR.PATCH, got: $GITHUB_REF_NAME" >&2
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag must look like vMAJOR.MINOR.PATCH, got: $TAG" >&2
             exit 1
           fi
 
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG_VERSION="${TAG#v}"
           CARGO_VERSION="$(cargo metadata --no-deps --format-version 1 |
               jq -r --arg name "$CRATE_NAME" '.packages[] | select(.name == $name) | .version'
           )"
@@ -110,6 +106,7 @@ jobs:
 
   build:
     name: Build ${{ matrix.target }}
+    needs: validate
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -150,7 +147,7 @@ jobs:
 
   release:
     name: Publish the release
-    needs: build
+    needs: [build, publish-crate]
     runs-on: ubuntu-latest
 
     permissions:
@@ -251,19 +248,21 @@ jobs:
             on_macos do
               depends_on arch: :arm64
 
-              url "$BASE/rin-aarch64-apple-darwin.tar.gz"
-              sha256 "$MACOS_ARM"
+              on_arm do
+                url "$BASE/rin-aarch64-apple-darwin.tar.gz"
+                sha256 "$MACOS_ARM"
+              end
             end
 
             on_linux do
-              on_arm do
-                url "$BASE/rin-aarch64-unknown-linux-musl.tar.gz"
-                sha256 "$LINUX_ARM"
-              end
-
               on_intel do
                 url "$BASE/rin-x86_64-unknown-linux-musl.tar.gz"
                 sha256 "$LINUX_INTEL"
+              end
+
+              on_arm do
+                url "$BASE/rin-aarch64-unknown-linux-musl.tar.gz"
+                sha256 "$LINUX_ARM"
               end
             end
 
