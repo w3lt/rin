@@ -189,15 +189,22 @@ jobs:
     environment: release
 
     env:
-      FORMULA: Formula/rib.rb
+      FORMULA: Formula/rin.rb
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: w3lt/homebrew-tap
+          path: tap
           ssh-key: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
 
-      - name: Bump the formula
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Write the formula
+        working-directory: tap
         run: |
           set -euo pipefail
 
@@ -207,10 +214,11 @@ jobs:
           fi
 
           VERSION="${TAG#v}"
-          CURRENT="$(sed -nE 's|^  url ".*/refs/tags/v([^"]+)\.tar\.gz"$|\1|p' "$FORMULA")"
+          CURRENT="$(grep -m1 -oE 'v[0-9]+\.[0-9]+\.[0-9]+' "$FORMULA" || true)"
+          CURRENT="${CURRENT#v}"
 
           if [[ -z "$CURRENT" ]]; then
-            echo "No tag archive url found in $FORMULA, update it by hand" >&2
+            echo "No version found in $FORMULA, update it by hand" >&2
             exit 1
           fi
 
@@ -219,16 +227,57 @@ jobs:
             exit 0
           fi
 
-          URL="https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$TAG.tar.gz"
-          SHA256="$(curl --proto "=https" -fsSL --retry 3 "$URL" | sha256sum | cut -d' ' -f1)"
+          sha() { sha256sum "../dist/rin-$1.tar.gz" | cut -d' ' -f1; }
+          MACOS_ARM="$(sha aarch64-apple-darwin)"
+          LINUX_INTEL="$(sha x86_64-unknown-linux-musl)"
+          LINUX_ARM="$(sha aarch64-unknown-linux-musl)"
 
-          sed -i -E \
-            -e "s|^  url \".*\"$|  url \"$URL\"|" \
-            -e "s|^  sha256 \"[0-9a-f]{64}\"$|  sha256 \"$SHA256\"|" \
-            "$FORMULA"
+          INSTALL='bin.install "rin"'
+          tar -xzf ../dist/rin-x86_64-unknown-linux-musl.tar.gz -C "$RUNNER_TEMP" rin
+          if "$RUNNER_TEMP/rin" completions bash > /dev/null 2>&1; then
+            INSTALL+=$'\n    generate_completions_from_executable(bin/"rin", "completions")'
+          fi
 
-          grep -qxF "  url \"$URL\"" "$FORMULA"
-          grep -qxF "  sha256 \"$SHA256\"" "$FORMULA"
+          REPO="https://github.com/$GITHUB_REPOSITORY"
+          BASE="$REPO/releases/download/$TAG"
+
+          cat > "$FORMULA" <<EOF
+          class Rin < Formula
+            desc "Deploy and manage your team of AI agents"
+            homepage "$REPO"
+            version "$VERSION"
+            license any_of: ["MIT", "Apache-2.0"]
+
+            on_macos do
+              depends_on arch: :arm64
+
+              url "$BASE/rin-aarch64-apple-darwin.tar.gz"
+              sha256 "$MACOS_ARM"
+            end
+
+            on_linux do
+              on_arm do
+                url "$BASE/rin-aarch64-unknown-linux-musl.tar.gz"
+                sha256 "$LINUX_ARM"
+              end
+
+              on_intel do
+                url "$BASE/rin-x86_64-unknown-linux-musl.tar.gz"
+                sha256 "$LINUX_INTEL"
+              end
+            end
+
+            deny_network_access!
+
+            def.install
+              $INSTALL
+            end
+
+            test do
+              assert_match(/usage:/i, shell_output("#{bin}/rin --help"))
+            end
+          end
+          EOF
 
           if git diff --quiet; then
             echo "Tap already at $VERSION"
