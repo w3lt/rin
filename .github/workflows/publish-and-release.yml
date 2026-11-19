@@ -220,7 +220,7 @@ jobs:
           fi
 
           URL="https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$TAG.tar.gz"
-          SHA256="$(curl -fsSL --retry 3 "$URL" | sha256sum | cut -d' ' -f1)"
+          SHA256="$(curl --proto "=https" -fsSL --retry 3 "$URL" | sha256sum | cut -d' ' -f1)"
 
           sed -i -E \
             -e "s|^  url \".*\"$|  url \"$URL\"|" \
