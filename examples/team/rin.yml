@@ -1,11 +1,11 @@
 # yaml-language-server: $schema=../../rin-schema.json
 rin: tohsaka
-name: my-team # team name: folder in $RIN_HOME, Compose project rin-my-team
-version: 0.1.1 # the rin version everyone on this team must use
+name: my-team
+version: 0.1.1
 
 messaging:
-  timeout: 30m # how long a sender waits for a reply
-  maxHops: 5 # longest chain of agent → agent messages
+  timeout: 30m
+  maxHops: 5
 
 agents:
   - id: rin
@@ -14,7 +14,7 @@ agents:
     harness: claude-code
     authentication: subscription
     model: claude-opus-5-5
-    maxSessions: 3 # parallel delegated sessions (default 3)
+    maxSessions: 3
     resources: { cpus: 2, ram: 4g }
 
   - id: backend
