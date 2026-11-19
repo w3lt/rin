@@ -20,6 +20,7 @@ concurrency:
 
 env:
   TAG: ${{ inputs.tag || github.ref_name }}
+  CRATE_NAME: tohsaka
 
 jobs:
   validate:
