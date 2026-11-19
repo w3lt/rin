@@ -9,6 +9,9 @@ cfg_select! {
         mod team;
 
         use std::path::PathBuf;
+
+        use clap_complete::{generate, Shell};
+        use clap::CommandFactory;
     }
     _ => {}
 }
@@ -92,6 +95,9 @@ enum Cmd {
 #[cfg(feature = "host")]
 #[derive(Subcommand)]
 enum HostCmd {
+    Completions {
+        shell: Shell,
+    },
     /// Validate rin.yml and write the team's folder in $RIN_HOME; makes it the current team.
     Generate {
         /// Folder with one <agent id>/INSTRUCTIONS.md per agent.
@@ -107,13 +113,17 @@ enum HostCmd {
         file: PathBuf,
     },
     /// Switch the current team.
-    Use { name: String },
+    Use {
+        name: String,
+    },
     /// Start the team (builds images the first time).
     Up,
     /// Stop the team; homes and the log are kept.
     Down,
     /// Open a shell in an agent's container.
-    Shell { id: String },
+    Shell {
+        id: String,
+    },
     /// Agents' state, sessions and queues, and deadlock warnings.
     Status,
     /// Message history.
@@ -151,6 +161,10 @@ async fn run(cli: Cli) -> Result<()> {
     match cli.command {
         #[cfg(feature = "host")]
         Cmd::Host(cmd) => match cmd {
+            HostCmd::Completions { shell } => {
+                let mut cmd = Cli::command();
+                generate(shell, &mut cmd, "rin", &mut std::io::stdout())
+            }
             HostCmd::Generate { instructions, file } => {
                 host_cli::generate_config(file, instructions)?
             }
