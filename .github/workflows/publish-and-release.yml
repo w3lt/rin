@@ -269,7 +269,7 @@ jobs:
 
             deny_network_access!
 
-            def.install
+            def install
               $INSTALL
             end
 
