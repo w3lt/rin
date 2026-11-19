@@ -354,6 +354,15 @@ mod tests {
 
     const EXAMPLE: &str = include_str!("../../examples/team/rin.yml");
 
+    fn example() -> String {
+        let pinned = config::from_yaml(EXAMPLE).unwrap().version;
+        EXAMPLE.replacen(
+            &format!("version: {pinned}"),
+            &format!("version: {VERSION}"),
+            1,
+        )
+    }
+
     /// A project folder (copy of examples/team, edited) and an empty `$RIN_HOME`.
     struct Fixture {
         root: PathBuf,
@@ -369,7 +378,7 @@ mod tests {
                 fs::create_dir_all(&dir).unwrap();
                 fs::write(dir.join("INSTRUCTIONS.md"), format!("# {id}\n")).unwrap();
             }
-            fs::write(root.join("project/rin.yml"), EXAMPLE).unwrap();
+            fs::write(root.join("project/rin.yml"), example()).unwrap();
             fs::create_dir_all(root.join("home")).unwrap();
             fs::write(
                 root.join("home/keys.env"),
@@ -726,7 +735,7 @@ mod tests {
     #[test]
     fn refuses_another_version() {
         let f = Fixture::new("version");
-        f.edit("version: 0.1.0", "version: 0.0.9");
+        f.edit(&format!("version: {VERSION}"), "version: 0.0.9");
         let e = format!("{:#}", f.generate().unwrap_err());
         assert!(e.contains("0.0.9") && e.contains(VERSION), "{e}");
     }

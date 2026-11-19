@@ -309,8 +309,9 @@ mod tests {
 
     #[test]
     fn rejects_bad_versions() {
-        assert!(err(&edit("version: 0.1.0", "version: 0.1.0-beta")).contains("/version"));
-        assert!(err(&edit("version: 0.1.0", "version: 1")).contains("/version"));
+        let line = format!("version: {}", from_yaml(EXAMPLE).unwrap().version);
+        assert!(err(&edit(&line, &format!("{line}-beta"))).contains("/version"));
+        assert!(err(&edit(&line, "version: 1")).contains("/version"));
     }
 
     #[test]
