@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn example_parses_with_defaults_filled() {
-        let config = from_yaml(&edit("messaging:\n  timeout: 30m     # how long a sender waits for a reply\n  maxHops: 5       # longest chain of agent → agent messages\n", "")).unwrap();
+        let config = from_yaml(&edit("messaging:\n  timeout: 30m\n  maxHops: 5\n", "")).unwrap();
         let json = serde_json::to_value(&config).unwrap();
         assert_eq!(
             json["messaging"],
