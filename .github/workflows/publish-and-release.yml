@@ -1,9 +1,15 @@
-name: Publish crate on crates.io
+name: Publish crate on crates.io & Release binaries
 
 on:
   push:
     tags:
       - "v*.*.*"
+  # Build a tag that already exists, e.g. one pushed before this workflow did.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build, e.g. v0.1.0
+        required: true
 
 permissions:
   contents: read
@@ -13,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  CRATE_NAME: tohsaka
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   validate:
@@ -100,3 +106,77 @@ jobs:
         run: cargo publish --locked --package "$CRATE_NAME"
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        include:
+          - { target: aarch64-apple-darwin, os: macos-latest }
+          # Static (musl), so the binary does not depend on the host's glibc.
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-24.04-arm }
+
+    env:
+      TARGET: ${{ matrix.target }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Install Rust stable
+        run: |
+          set -euo pipefail
+
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add "$TARGET"
+
+      - name: Build
+        run: cargo build --release --locked --target "$TARGET"
+
+      - name: Package
+        run: tar -czf "rin-$TARGET.tar.gz" -C "target/$TARGET/release" rin -C "$PWD" LICENSE-MIT LICENSE-APACHE
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rin-${{ matrix.target }}
+          path: rin-${{ matrix.target }}.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: Publish the release
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          merge-multiple: true
+
+      - name: Check the packaged binary is this version
+        run: |
+          set -euo pipefail
+
+          tar -xzf rin-x86_64-unknown-linux-musl.tar.gz rin
+          test "$(./rin --version)" = "rin ${TAG#v}"
+
+      - name: Upload to the GitHub release
+        run: |
+          set -euo pipefail
+
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" rin-*.tar.gz --clobber
+          else
+            gh release create "$TAG" rin-*.tar.gz --verify-tag --generate-notes
+          fi
