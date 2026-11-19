@@ -8,8 +8,8 @@ use anyhow::{Context, Result, bail};
 use serde_json::json;
 
 use crate::compose;
-use crate::config::{self, Authentication, Config, VERSION};
 use crate::files::{random_hex, write_if_changed, write_private, write_shared};
+use crate::shared::config::{self, Authentication, Config, VERSION};
 use crate::team::{self, Team, Tokens, read_tokens};
 
 pub const DOCKERFILE: &str = include_str!("../../images/Dockerfile");

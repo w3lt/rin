@@ -11,11 +11,11 @@ use serde_json::json;
 
 use crate::agent_runtime::Runtime;
 use crate::client::Client;
-use crate::config::Harness;
 use crate::hub::auth::{Principal, Resolver};
 use crate::hub::db::Db;
 use crate::hub::{Hub, HubError};
 use crate::proto::{Kind, SendRequest};
+use crate::shared::config::{self, Harness};
 
 /// Answers `<first prompt line> | hops=<RIN_HOPS> | <message>`; `sleep N …` sleeps N seconds
 /// (in a child process, whose pid it records), `fail` exits 3, `bg` leaves a
@@ -69,8 +69,8 @@ async fn team(name: &str, timeout: Duration) -> Team {
                 "harness": "claude-code", "authentication": "subscription", "model": "fake-model",
                 "maxSessions": max, "resources": { "cpus": 1, "ram": "1g" } })
     };
-    let config = crate::config::from_value(json!({
-        "rin": "tohsaka", "name": "e2e", "version": crate::config::VERSION,
+    let config = config::from_value(json!({
+        "rin": "tohsaka", "name": "e2e", "version": config::VERSION,
         "messaging": { "timeout": "1m", "maxHops": 3 },
         "agents": [agent("a", 1), agent("b", 3), agent("down", 1), agent("stale", 1)],
     }))

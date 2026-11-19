@@ -11,7 +11,7 @@ use std::time::Duration;
 use anyhow::{Context, Result, bail};
 use serde_json::{Map, Value, json};
 
-use crate::config::Harness;
+use crate::shared::config::Harness;
 
 pub struct Settings<'a> {
     pub harness: Harness,

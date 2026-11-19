@@ -3,10 +3,12 @@
 mod generate;
 
 use crate::client::Client;
+use crate::files;
 use crate::team::{self, Team};
-use crate::{config, display};
+use crate::{display, shared::config};
 use anyhow::{Context, Result, bail};
 use std::collections::HashMap;
+use std::fs;
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
@@ -205,7 +207,7 @@ pub async fn status(team: &Team) -> Result<()> {
         rows.push(vec![
             agent.id.clone(),
             agent.label.clone(),
-            agent.kind.as_str().into(),
+            agent.agent_type.as_str().into(),
             agent.harness.as_str().into(),
             state,
             sessions,
@@ -293,5 +295,44 @@ pub fn generate_config(config_file: PathBuf, instructions: PathBuf) -> Result<()
         generated.team.name,
         generated.team.dir.display()
     );
+    Ok(())
+}
+
+pub fn init_project(name: Option<String>, path: PathBuf) -> Result<()> {
+    println!("INITIALIZING NEW PROJECT...");
+
+    let name = if let Some(name) = name {
+        name
+    } else {
+        config::Config::dummy_team_name()
+    };
+
+    let path = path.join(&name);
+
+    if path.exists() && !path.is_dir() {
+        bail!("{} is not a directory", path.display());
+    }
+
+    fs::create_dir_all(&path).with_context(|| format!("Cannot create {}", path.display()))?;
+
+    let (config, instructions) = config::Config::init(name);
+
+    let config_path = path.join("rin.yml");
+    let yaml = format!(
+        "{}\n{}",
+        config::rin_yaml_schema_directive(),
+        serde_saphyr::to_string(&config)?
+    );
+    files::write_if_changed(&config_path, yaml.as_bytes())?;
+
+    for (agent, text) in config.agents.iter().zip(&instructions) {
+        files::write_if_changed(
+            &path.join("agents").join(&agent.id).join("INSTRUCTION.md"),
+            text.as_bytes(),
+        )?;
+    }
+
+    println!("DONE! HAVE HACKING WITH RIN!!!");
+
     Ok(())
 }

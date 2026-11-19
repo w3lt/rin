@@ -22,8 +22,8 @@ use serde::Deserialize;
 use serde_json::json;
 use tokio::time::Instant;
 
-use crate::config::Config;
 use crate::proto::{AgentRow, AgentsResponse, RunRequest, RunResponse, SendRequest};
+use crate::shared::config::{self, Config};
 use auth::{Principal, Resolver};
 use db::Db;
 use sched::{Admit, MsgId, Sched};
@@ -40,7 +40,7 @@ const MIN_START_SHARE: u32 = 10;
 const MIN_START_MAX: Duration = Duration::from_secs(10);
 
 pub struct Hub {
-    config: Config,
+    config: config::Config,
     /// `messaging.timeout` (tests shorten it).
     pub(crate) timeout: Duration,
     /// Hostnames of the team's containers: the agents, and Bifrost if it runs.
@@ -231,7 +231,7 @@ impl Hub {
             if left < (self.timeout / MIN_START_SHARE).min(MIN_START_MAX) {
                 return Err(HubError::Timeout(format!(
                     "timeout: {to} was busy until {} before the {} timeout; the message was not started",
-                    crate::config::format_duration(left),
+                    config::format_duration(left),
                     self.timeout_text()
                 )));
             }
@@ -240,7 +240,7 @@ impl Hub {
     }
 
     fn timeout_text(&self) -> String {
-        crate::config::format_duration(self.timeout)
+        config::format_duration(self.timeout)
     }
 
     fn timed_out(&self, to: &str) -> HubError {
@@ -347,7 +347,7 @@ impl Hub {
                 AgentRow {
                     id: agent.id.clone(),
                     label: agent.label.clone(),
-                    kind: agent.kind.as_str().to_string(),
+                    kind: agent.agent_type.as_str().to_string(),
                     harness: agent.harness.as_str().to_string(),
                     sessions: usage.running,
                     max_sessions: usage.max,
@@ -492,7 +492,7 @@ pub async fn main() -> Result<()> {
     let db_path = env_or("RIN_DB", "/var/lib/rin/hub.db");
     let listen = env_or("RIN_LISTEN", "0.0.0.0:7000");
 
-    let config = crate::config::from_json_file(std::path::Path::new(&config_path))?;
+    let config = config::from_json_file(std::path::Path::new(&config_path))?;
     let text = std::fs::read_to_string(&tokens_path)
         .with_context(|| format!("cannot read {tokens_path}"))?;
     let tokens: HashMap<String, String> = serde_json::from_str(&text)

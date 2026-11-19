@@ -1,4 +1,5 @@
 pub mod cmd;
+pub mod config;
 
 use crate::client::{Client, current_hops};
 use anyhow::Result;

@@ -21,8 +21,8 @@ use axum::routing::post;
 use nix::sys::signal::{Signal, killpg};
 use nix::unistd::Pid;
 
-use crate::config::{Harness, format_duration, parse_minutes};
 use crate::proto::{RunRequest, RunResponse};
+use crate::shared::config::{Harness, format_duration, parse_minutes};
 
 /// How many lines of a failed session's output go back to the sender.
 const LAST_LINES: usize = 20;

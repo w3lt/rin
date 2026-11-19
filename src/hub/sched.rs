@@ -1,10 +1,10 @@
 //! Session slots per agent (`maxSessions`), the first-come-first-served queue
 //! in front of them, and deadlock detection over who is waiting on whom.
 
+use crate::shared::config;
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::time::{Duration, Instant};
-
 use tokio::sync::oneshot;
 
 pub type MsgId = u64;
@@ -263,7 +263,7 @@ impl fmt::Display for Deadlock {
             f,
             "⚠ possible deadlock: {names} ({usage}, {} queued for {})",
             self.queued,
-            crate::config::format_duration(self.since)
+            config::format_duration(self.since)
         )
     }
 }

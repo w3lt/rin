@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, anyhow, bail};
 
-use crate::config::Config;
+use crate::shared::config::{self, Config};
 
 /// Where the hub is published on your machine.
 pub const HOST_HUB_URL: &str = "http://127.0.0.1:10302";
@@ -90,7 +90,7 @@ impl Team {
     }
 
     pub fn config(&self) -> Result<Config> {
-        crate::config::from_json_file(&self.rin_json())
+        config::from_json_file(&self.rin_json())
     }
 
     pub fn tokens(&self) -> Result<Tokens> {

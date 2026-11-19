@@ -46,7 +46,6 @@ cfg_select! {
 }
 
 mod client;
-mod config;
 mod display;
 mod proto;
 mod shared;
@@ -97,6 +96,14 @@ enum Cmd {
 enum HostCmd {
     Completions {
         shell: Shell,
+    },
+    /// Init new Rin project
+    Init {
+        /// Directory where the configuration will be initialized
+        #[arg(short = 'd', long = "dir", default_value = ".", value_name = "DIR")]
+        directory: PathBuf,
+
+        name: Option<String>,
     },
     /// Validate rin.yml and write the team's folder in $RIN_HOME; makes it the current team.
     Generate {
@@ -165,6 +172,7 @@ async fn run(cli: Cli) -> Result<()> {
                 let mut cmd = Cli::command();
                 generate(shell, &mut cmd, "rin", &mut std::io::stdout())
             }
+            HostCmd::Init { directory, name } => host_cli::init_project(name, directory)?,
             HostCmd::Generate { instructions, file } => {
                 host_cli::generate_config(file, instructions)?
             }

@@ -1,7 +1,7 @@
 //! The generated `docker-compose.yml`. It holds no secrets: tokens and
 //! virtual keys reach containers through `env/<id>.env` files.
 
-use crate::config::{Agent, Authentication, Config, Harness};
+use crate::shared::config::{Agent, Authentication, Config, Harness};
 use crate::yaml::{Yaml, list, map, s};
 
 pub const BIFROST_IMAGE: &str = "maximhq/bifrost:v2.5.1";
