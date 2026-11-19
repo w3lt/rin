@@ -180,3 +180,62 @@ jobs:
           else
             gh release create "$TAG" rin-*.tar.gz --verify-tag --generate-notes
           fi
+
+  update-tap:
+    name: Update the Homebrew tap
+    needs: release
+    runs-on: ubuntu-latest
+    environment: release
+
+    env:
+      FORMULA: Formula/rib.rb
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: w3lt/homebrew-tap
+          ssh-key: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+
+      - name: Bump the formula
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag must look like vMAJOR.MINOR.PATCH, got: $TAG" >&2
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"
+          CURRENT="$(sed -nE 's|^  url ".*/refs/tags/v([^"]+)\.tar\.gz"$|\1|p' "$FORMULA")"
+
+          if [[ -z "$CURRENT" ]]; then
+            echo "No tag archive url found in $FORMULA, update it by hand" >&2
+            exit 1
+          fi
+
+          if [[ "$(printf '%s\n' "$CURRENT" "$VERSION" | sort -V | tail -n1)" != "$VERSION" ]]; then
+            echo "Tap is at $CURRENT, newer than $VERSION; leaving it alone"
+            exit 0
+          fi
+
+          URL="https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$TAG.tar.gz"
+          SHA256="$(curl -fsSL --retry 3 "$URL" | sha256sum | cut -d' ' -f1)"
+
+          sed -i -E \
+            -e "s|^  url \".*\"$|  url \"$URL\"|" \
+            -e "s|^  sha256 \"[0-9a-f]{64}\"$|  sha256 \"$SHA256\"|" \
+            "$FORMULA"
+
+          grep -qxF "  url \"$URL\"" "$FORMULA"
+          grep -qxF "  sha256 \"$SHA256\"" "$FORMULA"
+
+          if git diff --quiet; then
+            echo "Tap already at $VERSION"
+            exit 0
+          fi
+
+          git diff
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -am "rin $VERSION"
+          git push origin HEAD:main
