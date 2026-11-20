@@ -141,9 +141,9 @@ impl Agent {
             },
             "# Rin — Chief Architect
 
-            You lead this team.
-            Break work down and delegate to the right teammate with the `send_message` tool; `list_agents` shows who is on the team and how busy they are.
-            Review what comes back before you report to the user."
+You lead this team.
+Break work down and delegate to the right teammate with the `send_message` tool; `list_agents` shows who is on the team and how busy they are.
+Review what comes back before you report to the user."
                 .to_string()
         )
     }
@@ -165,11 +165,11 @@ impl Agent {
             },
             "# Backend Engineer
 
-            You own APIs, data and services.
+You own APIs, data and services.
 
-            To message a teammate, run `rin send <id> \"<text>\"` in the shell: it waits and prints their reply.
-            `rin agents` lists the team."
-                .to_string()
+To message a teammate, run `rin send <id> \"<text>\"` in the shell: it waits and prints their reply.
+`rin agents` lists the team."
+                .to_string(),
         )
     }
 
@@ -190,8 +190,8 @@ impl Agent {
             },
             "# Frontend Engineer
 
-            You own the user interface. Use `send_message` to ask teammates for what you
-            need; `list_agents` shows the team."
+You own the user interface. Use `send_message` to ask teammates for what you
+need; `list_agents` shows the team."
                 .to_string(),
         )
     }
@@ -213,11 +213,11 @@ impl Agent {
             },
             "# DevOps Engineer
 
-            You own infrastructure, CI/CD and deployments.
+You own infrastructure, CI/CD and deployments.
 
-            To message a teammate, run `rin send <id> \"<text>\"` in the shell: it waits and prints their reply.
-            `rin agents` lists the team."
-                .to_string()
+To message a teammate, run `rin send <id> \"<text>\"` in the shell: it waits and prints their reply.
+`rin agents` lists the team."
+                .to_string(),
         )
     }
 }
@@ -450,10 +450,16 @@ mod tests {
 
     #[test]
     fn rejects_non_rin_configs() {
-        assert_eq!(err(&edit("rin: tohsaka\n", "")), NOT_A_RIN_CONFIG);
-        assert_eq!(err(&edit("rin: tohsaka", "rin: saber")), NOT_A_RIN_CONFIG);
-        assert_eq!(err(""), NOT_A_RIN_CONFIG);
-        assert_eq!(err("- 1\n"), NOT_A_RIN_CONFIG);
+        assert_eq!(
+            err(&edit("rin: tohsaka\n", "")),
+            format!("[Rin] {NOT_A_RIN_CONFIG}")
+        );
+        assert_eq!(
+            err(&edit("rin: tohsaka", "rin: saber")),
+            format!("[Rin] {NOT_A_RIN_CONFIG}")
+        );
+        assert_eq!(err(""), format!("[Rin] {NOT_A_RIN_CONFIG}"));
+        assert_eq!(err("- 1\n"), format!("[Rin] {NOT_A_RIN_CONFIG}"));
     }
 
     #[test]
@@ -527,7 +533,7 @@ mod tests {
             ("maxSessions: 3", "maxSessions: 0"),
         ] {
             let e = err(&edit(from, to));
-            assert!(e.starts_with("invalid config:"), "{to}: {e}");
+            assert!(e.starts_with("[Rin] invalid config:"), "{to}: {e}");
         }
     }
 
@@ -573,5 +579,64 @@ mod tests {
         assert_eq!(format_duration(Duration::from_secs(59)), "59s");
         assert_eq!(format_duration(Duration::from_secs(61)), "1m");
         assert_eq!(format_duration(Duration::from_secs(3700)), "1h1m");
+    }
+
+    #[test]
+    fn tohsaka_is_the_only_rin() {
+        assert_eq!(
+            serde_json::to_value(Tohsaka).unwrap(),
+            serde_json::json!("tohsaka")
+        );
+        assert_eq!(
+            serde_json::from_value::<Tohsaka>(serde_json::json!("tohsaka")).unwrap(),
+            Tohsaka
+        );
+        assert_eq!(
+            serde_json::from_str::<Tohsaka>(r#""tohsaka""#).unwrap(),
+            Tohsaka
+        );
+        assert!(serde_json::from_value::<Tohsaka>(serde_json::json!("saber")).is_err());
+        assert!(serde_json::from_value::<Tohsaka>(serde_json::json!(1)).is_err());
+    }
+
+    #[test]
+    fn init_makes_a_valid_team() {
+        let (config, instructions) = Config::init("my-team".into());
+        assert_eq!(config.rin, Tohsaka);
+        assert_eq!(config.name, "my-team");
+        assert_eq!(config.version, VERSION);
+        assert_eq!(config.messaging, Messaging::default());
+        assert_eq!(instructions.len(), config.agents.len());
+
+        let back = from_value(serde_json::to_value(&config).unwrap()).unwrap();
+        assert_eq!(back, config);
+    }
+
+    #[test]
+    fn init_instructions_are_unindented_markdown() {
+        let (config, instructions) = Config::init("my-team".into());
+        for (agent, text) in config.agents.iter().zip(&instructions) {
+            assert!(text.starts_with("# "), "{}: {text:?}", agent.id);
+            for line in text.lines() {
+                assert!(!line.starts_with(' '), "{}: indented {line:?}", agent.id);
+            }
+        }
+    }
+
+    #[test]
+    fn dummy_team_name_is_a_valid_name() {
+        let (config, _) = Config::init(Config::dummy_team_name());
+        assert_eq!(
+            from_value(serde_json::to_value(&config).unwrap()).unwrap(),
+            config
+        );
+    }
+
+    #[test]
+    fn schema_directive_points_at_this_versions_schema() {
+        let directive = rin_yaml_schema_directive();
+        assert!(directive.starts_with("# yaml-language-server: $schema=https://"));
+        assert!(directive.ends_with(&format!("/v{VERSION}/rin-schema.json")));
+        assert!(!directive.contains('\n'));
     }
 }
