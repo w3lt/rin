@@ -13,6 +13,7 @@ use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::fs;
 use std::os::unix::process::CommandExt;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
@@ -302,19 +303,10 @@ pub fn generate_config(config_file: PathBuf, instructions: PathBuf) -> Result<()
 }
 
 pub fn init_project(name: Option<String>, path: PathBuf) -> Result<()> {
-    let name = if let Some(name) = name {
-        name
-    } else {
-        config::Config::dummy_team_name()
-    };
-
+    let name = name.unwrap_or(config::Config::dummy_team_name());
     let path = path.join(&name);
-
-    if path.exists() && !path.is_dir() {
-        rin_bail!("{} is not a directory", path.display());
-    }
-
-    fs::create_dir_all(&path).with_context(|| format!("Cannot create {}", path.display()))?;
+    ensure_project_dir(&path)?;
+    ensure_not_initialized(&path)?;
 
     let (config, instructions) = config::Config::init(name);
 
@@ -336,4 +328,109 @@ pub fn init_project(name: Option<String>, path: PathBuf) -> Result<()> {
     rinlogln!("Done! Happy hacking with Rin!");
 
     Ok(())
+}
+
+fn ensure_project_dir(path: &Path) -> Result<()> {
+    if path.exists() && !path.is_dir() {
+        rin_bail!("{} is not a directory", path.display());
+    }
+
+    fs::create_dir_all(&path).with_context(|| format!("Cannot create {}", path.display()))?;
+    Ok(())
+}
+
+fn ensure_not_initialized(path: &Path) -> Result<()> {
+    let rin_path = path.join("rin.yml");
+    if rin_path.is_file() {
+        rin_bail!("{} is already a Rin project", path.display());
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct Scratch(PathBuf);
+
+    impl Scratch {
+        fn new(name: &str) -> Scratch {
+            let dir = std::env::temp_dir().join(format!("rin-init-{name}-{}", std::process::id()));
+            let _ = fs::remove_dir_all(&dir);
+            fs::create_dir_all(&dir).unwrap();
+            Scratch(dir)
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn init_writes_rin_yml_and_instructions() {
+        let s = Scratch::new("files");
+        init_project(Some("my-team".into()), s.0.clone()).unwrap();
+        let project = s.0.join("my-team");
+        let (expected, instructions) = config::Config::init("my-team".into());
+
+        let yaml = fs::read_to_string(project.join("rin.yml")).unwrap();
+        assert!(yaml.starts_with(&format!("{}\n", config::rin_yaml_schema_directive())));
+        assert_eq!(config::from_yaml(&yaml).unwrap(), expected);
+
+        let mut folders: Vec<_> = fs::read_dir(project.join("agents"))
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        folders.sort();
+        let mut ids: Vec<_> = expected.agents.iter().map(|a| a.id.clone()).collect();
+        ids.sort();
+        assert_eq!(folders, ids);
+        for (agent, text) in expected.agents.iter().zip(&instructions) {
+            let file = project
+                .join("agents")
+                .join(&agent.id)
+                .join("INSTRUCTIONS.md");
+            assert_eq!(
+                &fs::read_to_string(&file).unwrap(),
+                text,
+                "{}",
+                file.display()
+            );
+        }
+    }
+
+    #[test]
+    fn init_without_a_name_makes_rinteam() {
+        let s = Scratch::new("default-name");
+        init_project(None, s.0.clone()).unwrap();
+        let yaml = fs::read_to_string(s.0.join("rinteam/rin.yml")).unwrap();
+        assert_eq!(config::from_yaml(&yaml).unwrap().name, "rinteam");
+    }
+
+    #[test]
+    fn init_refuses_a_file_in_the_way() {
+        let s = Scratch::new("file");
+        fs::write(s.0.join("my-team"), "mine").unwrap();
+        let e = init_project(Some("my-team".into()), s.0.clone()).unwrap_err();
+        assert!(format!("{e:#}").contains("is not a directory"), "{e:#}");
+        assert_eq!(fs::read_to_string(s.0.join("my-team")).unwrap(), "mine");
+    }
+
+    #[test]
+    fn rin_generate_accepts_what_init_writes() {
+        let s = Scratch::new("generate");
+        init_project(Some("my-team".into()), s.0.clone()).unwrap();
+        let project = s.0.join("my-team");
+        let generated = generate::generate(
+            &project.join("rin.yml"),
+            &project.join("agents"),
+            &s.0.join("home"),
+            config::VERSION,
+        )
+        .unwrap();
+        assert_eq!(generated.team.name, "my-team");
+    }
 }
