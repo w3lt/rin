@@ -7,7 +7,7 @@ pub mod log;
 #[macro_export]
 macro_rules! rin_bail {
     ($($arg:tt)*) => {
-        ::anyhow::bail!("[Rin] {}", format_args!($($arg)*))
+        ::anyhow::bail!("{}", format_args!($($arg)*))
     };
 }
 

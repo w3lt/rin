@@ -450,16 +450,10 @@ mod tests {
 
     #[test]
     fn rejects_non_rin_configs() {
-        assert_eq!(
-            err(&edit("rin: tohsaka\n", "")),
-            format!("[Rin] {NOT_A_RIN_CONFIG}")
-        );
-        assert_eq!(
-            err(&edit("rin: tohsaka", "rin: saber")),
-            format!("[Rin] {NOT_A_RIN_CONFIG}")
-        );
-        assert_eq!(err(""), format!("[Rin] {NOT_A_RIN_CONFIG}"));
-        assert_eq!(err("- 1\n"), format!("[Rin] {NOT_A_RIN_CONFIG}"));
+        assert_eq!(err(&edit("rin: tohsaka\n", "")), NOT_A_RIN_CONFIG);
+        assert_eq!(err(&edit("rin: tohsaka", "rin: saber")), NOT_A_RIN_CONFIG);
+        assert_eq!(err(""), NOT_A_RIN_CONFIG);
+        assert_eq!(err("- 1\n"), NOT_A_RIN_CONFIG);
     }
 
     #[test]
@@ -533,7 +527,7 @@ mod tests {
             ("maxSessions: 3", "maxSessions: 0"),
         ] {
             let e = err(&edit(from, to));
-            assert!(e.starts_with("[Rin] invalid config:"), "{to}: {e}");
+            assert!(e.starts_with("invalid config:"), "{to}: {e}");
         }
     }
 
