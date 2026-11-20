@@ -4,9 +4,12 @@ mod generate;
 
 use crate::client::Client;
 use crate::files;
+use crate::rin_bail;
+use crate::rinerrln;
+use crate::rinlogln;
 use crate::team::{self, Team};
 use crate::{display, shared::config};
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::fs;
 use std::os::unix::process::CommandExt;
@@ -31,7 +34,7 @@ fn run(mut command: Command) -> Result<()> {
         .status()
         .context("cannot run docker (is Docker installed and running?)")?;
     if !status.success() {
-        bail!("docker compose failed ({status})");
+        rin_bail!("docker compose failed ({status})");
     }
     Ok(())
 }
@@ -52,7 +55,7 @@ fn states(team: &Team) -> Result<HashMap<String, String>> {
         .output()
         .context("cannot run docker (is Docker installed and running?)")?;
     if !output.status.success() {
-        bail!(
+        rin_bail!(
             "docker compose ps failed: {}",
             String::from_utf8_lossy(&output.stderr).trim()
         );
@@ -108,7 +111,7 @@ pub fn up(team: &Team) -> Result<()> {
     let hub_up = states.get("hub").is_some_and(|s| s == "running");
     let any_up = states.values().any(|s| s == "running");
     if !hub_up && std::net::TcpListener::bind(("127.0.0.1", team::HUB_PORT)).is_err() {
-        bail!(
+        rin_bail!(
             "cannot start team {}: port {} on 127.0.0.1 is already in use{}. Only one Rin team can be up at a time: run `rin down --team <name>` first",
             team.name,
             team::HUB_PORT,
@@ -132,7 +135,7 @@ pub fn up(team: &Team) -> Result<()> {
         } else {
             "is not up"
         };
-        bail!(
+        rin_bail!(
             "{e}\nteam {} {state}; if the error is about port {}, another Rin team or program is using it{}",
             team.name,
             team::HUB_PORT,
@@ -142,7 +145,7 @@ pub fn up(team: &Team) -> Result<()> {
     // Last, so the build output doesn't scroll it away.
     let keys_env = team::rin_home()?.join("keys.env");
     if !keys_env.is_file() && team.config().is_ok_and(|c| c.uses_api_keys()) {
-        eprintln!(
+        rinerrln!(
             "rin: warning: {} is missing: API-key agents will fail. Add your provider keys, then run `rin generate` and `rin up`",
             keys_env.display()
         );
@@ -167,7 +170,7 @@ pub fn down(team: &Team) -> Result<()> {
 /// Replaces this process with a shell in the agent's container.
 pub fn shell(team: &Team, id: &str) -> Result<()> {
     if team.config()?.agent(id).is_none() {
-        bail!("unknown agent: {id:?}");
+        rin_bail!("unknown agent: {id:?}");
     }
     let mut command = compose(team);
     command.args(["exec", "-u", "agent", id, "bash"]);
@@ -234,7 +237,7 @@ pub async fn log(team: &Team, follow: bool, agent: Option<&str>) -> Result<()> {
     if let Some(id) = agent
         && team.config()?.agent(id).is_none()
     {
-        bail!("unknown agent: {id:?}");
+        rin_bail!("unknown agent: {id:?}");
     }
     let mut client = client(team)?;
     let mut after = 0;
@@ -243,7 +246,7 @@ pub async fn log(team: &Team, follow: bool, agent: Option<&str>) -> Result<()> {
         match client.log(agent, after).await {
             Ok(page) => {
                 if std::mem::take(&mut lost) {
-                    eprintln!("rin: following again");
+                    rinerrln!("rin: following again");
                 }
                 let more = page.len() >= crate::proto::LOG_PAGE;
                 for event in page {
@@ -259,7 +262,7 @@ pub async fn log(team: &Team, follow: bool, agent: Option<&str>) -> Result<()> {
             }
             Err(e) if follow => {
                 if !std::mem::replace(&mut lost, true) {
-                    eprintln!("rin: {e:#} (still following)");
+                    rinerrln!("rin: {e:#} (still following)");
                 }
                 // The hub may come back with new tokens (`rin generate && rin up`).
                 if let Ok(fresh) = self::client(team) {
@@ -288,7 +291,7 @@ pub fn generate_config(config_file: PathBuf, instructions: PathBuf) -> Result<()
         .unwrap_or_else(|| format!("v{}", config::VERSION));
     let generated = generate::generate(&config_file, &instructions, &team::rin_home()?, &git_rev)?;
     for warning in &generated.warnings {
-        eprintln!("warning: {warning}");
+        rinerrln!("warning: {warning}");
     }
     println!(
         "team {} written to {} (now the current team)",
@@ -299,8 +302,6 @@ pub fn generate_config(config_file: PathBuf, instructions: PathBuf) -> Result<()
 }
 
 pub fn init_project(name: Option<String>, path: PathBuf) -> Result<()> {
-    println!("INITIALIZING NEW PROJECT...");
-
     let name = if let Some(name) = name {
         name
     } else {
@@ -310,7 +311,7 @@ pub fn init_project(name: Option<String>, path: PathBuf) -> Result<()> {
     let path = path.join(&name);
 
     if path.exists() && !path.is_dir() {
-        bail!("{} is not a directory", path.display());
+        rin_bail!("{} is not a directory", path.display());
     }
 
     fs::create_dir_all(&path).with_context(|| format!("Cannot create {}", path.display()))?;
@@ -327,12 +328,12 @@ pub fn init_project(name: Option<String>, path: PathBuf) -> Result<()> {
 
     for (agent, text) in config.agents.iter().zip(&instructions) {
         files::write_if_changed(
-            &path.join("agents").join(&agent.id).join("INSTRUCTION.md"),
+            &path.join("agents").join(&agent.id).join("INSTRUCTIONS.md"),
             text.as_bytes(),
         )?;
     }
 
-    println!("DONE! HAVE HACKING WITH RIN!!!");
+    rinlogln!("Done! Happy hacking with Rin!");
 
     Ok(())
 }

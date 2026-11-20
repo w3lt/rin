@@ -10,6 +10,7 @@
 
 mod default_config;
 
+use crate::rin_bail;
 use default_config::{default_max_hops, default_max_sessions, default_timeout};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -50,7 +51,7 @@ impl<'de> Deserialize<'de> for Tohsaka {
     where
         D: serde::Deserializer<'de>,
     {
-        match <&str>::deserialize(deserializer)? {
+        match String::deserialize(deserializer)?.as_str() {
             "tohsaka" => Ok(Tohsaka),
             _ => Err(serde::de::Error::custom("expected 'tohsaka'")),
         }
@@ -326,7 +327,7 @@ impl Config {
     /// Checks JSON Schema can't express.
     fn check(&self) -> anyhow::Result<()> {
         if parse_minutes(&self.messaging.timeout).is_none() {
-            anyhow::bail!(
+            rin_bail!(
                 "messaging.timeout: {} is longer than {MAX_MINUTES}m (a year)",
                 self.messaging.timeout
             );
@@ -334,7 +335,7 @@ impl Config {
         let mut seen = std::collections::HashSet::new();
         for agent in &self.agents {
             if !seen.insert(agent.id.as_str()) {
-                anyhow::bail!("duplicate agent id: {:?}", agent.id);
+                rin_bail!("duplicate agent id: {:?}", agent.id);
             }
         }
         Ok(())
@@ -367,7 +368,7 @@ pub fn from_json_file(path: &std::path::Path) -> anyhow::Result<Config> {
 #[cfg(any(feature = "host", feature = "hub"))]
 pub fn from_value(value: serde_json::Value) -> anyhow::Result<Config> {
     if value.get("rin").and_then(serde_json::Value::as_str) != Some("tohsaka") {
-        anyhow::bail!(NOT_A_RIN_CONFIG);
+        rin_bail!("{NOT_A_RIN_CONFIG}");
     }
     // Compiled once: `rin generate` reads every other team's config too.
     static VALIDATOR: std::sync::LazyLock<jsonschema::Validator> = std::sync::LazyLock::new(|| {
@@ -388,7 +389,7 @@ pub fn from_value(value: serde_json::Value) -> anyhow::Result<Config> {
         })
         .collect();
     if !problems.is_empty() {
-        anyhow::bail!("invalid config:\n{}", problems.join("\n"));
+        rin_bail!("invalid config:\n{}", problems.join("\n"));
     }
     let config: Config = serde_json::from_value(value)?;
     config.check()?;

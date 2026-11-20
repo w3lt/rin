@@ -1,10 +1,10 @@
 //! `$RIN_HOME` and the generated team folders in it.
 
+use crate::rin_bail;
+use anyhow::{Context, Result, anyhow};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-
-use anyhow::{Context, Result, anyhow, bail};
 
 use crate::shared::config::{self, Config};
 
@@ -61,11 +61,11 @@ impl Team {
         // One folder in teams/, never a path: `my-team/` would become the current
         // team as written, and then be no Compose project name.
         if Path::new(&name).file_name() != Some(std::ffi::OsStr::new(&name)) {
-            bail!("unknown team {name:?}: a team is named as in its rin.yml");
+            rin_bail!("unknown team {name:?}: a team is named as in its rin.yml");
         }
         let team = Team::at(&home, &name);
         if !team.rin_json().is_file() {
-            bail!(
+            rin_bail!(
                 "unknown team {name:?}: no {} (run `rin generate`)",
                 team.rin_json().display()
             );

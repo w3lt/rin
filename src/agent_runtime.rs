@@ -4,14 +4,8 @@
 pub mod harness;
 pub mod settings;
 
-use std::net::{IpAddr, SocketAddr};
-use std::path::{Path, PathBuf};
-use std::process::Stdio;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Duration;
-
-use anyhow::{Context, Result, anyhow, bail};
+use crate::rinerrln;
+use anyhow::{Context, Result, anyhow};
 use axum::Router;
 use axum::body::Bytes;
 use axum::extract::{ConnectInfo, State};
@@ -20,8 +14,15 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use nix::sys::signal::{Signal, killpg};
 use nix::unistd::Pid;
+use std::net::{IpAddr, SocketAddr};
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
 use crate::proto::{RunRequest, RunResponse};
+use crate::rin_bail;
 use crate::shared::config::{Harness, format_duration, parse_minutes};
 
 /// How many lines of a failed session's output go back to the sender.
@@ -345,7 +346,7 @@ pub async fn main() -> Result<()> {
         parse_minutes(&timeout_text).ok_or_else(|| anyhow!("bad RIN_TIMEOUT {timeout_text:?}"))?;
     let token = required("RIN_TOKEN")?;
     if token.is_empty() {
-        bail!("RIN_TOKEN is empty");
+        rin_bail!("RIN_TOKEN is empty");
     }
     let hub_url = std::env::var("RIN_HUB_URL").unwrap_or_else(|_| "http://hub:7000".into());
     let home = PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| "/home/agent".into()));
@@ -364,7 +365,7 @@ pub async fn main() -> Result<()> {
     )
     .context("cannot write harness settings")?;
     for path in written {
-        eprintln!("rin runtime: updated {}", path.display());
+        rinerrln!("rin runtime: updated {}", path.display());
     }
     std::fs::create_dir_all(home.join("work")).context("cannot create ~/work")?;
 
@@ -374,7 +375,7 @@ pub async fn main() -> Result<()> {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:7001")
         .await
         .context("cannot listen on 7001")?;
-    eprintln!(
+    rinerrln!(
         "rin runtime: {} on {model}, listening on 7001",
         harness.as_str()
     );

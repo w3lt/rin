@@ -1,5 +1,15 @@
 pub mod cmd;
 pub mod config;
+#[macro_use]
+pub mod log;
+
+/// Returns early with an `anyhow` error prefixed with `[Rin]`.
+#[macro_export]
+macro_rules! rin_bail {
+    ($($arg:tt)*) => {
+        ::anyhow::bail!("[Rin] {}", format_args!($($arg)*))
+    };
+}
 
 use crate::client::{Client, current_hops};
 use anyhow::Result;
@@ -25,5 +35,5 @@ fn sender(team: Option<&str>) -> Result<(Client, u32)> {
     }
 
     #[cfg(not(feature = "host"))]
-    anyhow::bail!("RIN_TOKEN is not set: run this inside an agent container")
+    rin_bail!("RIN_TOKEN is not set: run this inside an agent container")
 }

@@ -5,12 +5,7 @@ pub mod auth;
 pub mod db;
 pub mod sched;
 
-use std::collections::HashMap;
-use std::net::{IpAddr, SocketAddr};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Duration;
-
+use crate::rinerrln;
 use anyhow::{Context, Result};
 use axum::Router;
 use axum::body::Bytes;
@@ -20,6 +15,11 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
 use serde_json::json;
+use std::collections::HashMap;
+use std::net::{IpAddr, SocketAddr};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Duration;
 use tokio::time::Instant;
 
 use crate::proto::{AgentRow, AgentsResponse, RunRequest, RunResponse, SendRequest};
@@ -331,7 +331,7 @@ impl Hub {
         let fresh = self.sched().new_deadlocks(std::time::Instant::now());
         for deadlock in fresh {
             let text = deadlock.to_string();
-            eprintln!("rin hub: {text}");
+            rinerrln!("rin hub: {text}");
             self.db.warning(&deadlock.agents, &text);
         }
     }
@@ -523,7 +523,7 @@ pub async fn main() -> Result<()> {
     let listener = tokio::net::TcpListener::bind(&listen)
         .await
         .with_context(|| format!("cannot listen on {listen}"))?;
-    eprintln!("rin hub: team {} listening on {listen}", hub.config.name);
+    rinerrln!("rin hub: team {} listening on {listen}", hub.config.name);
     let app = router(hub).into_make_service_with_connect_info::<SocketAddr>();
     tokio::select! {
         result = axum::serve(listener, app) => result?,
