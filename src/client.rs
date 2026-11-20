@@ -5,7 +5,8 @@
     allow(dead_code)
 )]
 
-use anyhow::{Result, anyhow, bail};
+use crate::rin_bail;
+use anyhow::{Result, anyhow};
 use serde::de::DeserializeOwned;
 
 use crate::proto::{AgentsResponse, Event, MAX_BODY, SendRequest};
@@ -54,7 +55,7 @@ impl Client {
         // The hub would cut a bigger upload short, which reads as "cannot reach the hub".
         if body.len() > MAX_BODY {
             let kib = |n: usize| format!("{} KiB", n.div_ceil(1024));
-            bail!(
+            rin_bail!(
                 "message too long: {} as JSON, the hub takes at most {}",
                 kib(body.len()),
                 kib(MAX_BODY)
@@ -114,13 +115,15 @@ impl Client {
         let body: serde_json::Value = match serde_json::from_str(&text) {
             Ok(body) => body,
             // Errors raised before the hub's handlers (body too large, ...) are plain text.
-            Err(_) if !status.is_success() => bail!("the hub answered {status}: {}", text.trim()),
-            Err(e) => bail!("bad answer from the hub ({status}): {e}"),
+            Err(_) if !status.is_success() => {
+                rin_bail!("the hub answered {status}: {}", text.trim())
+            }
+            Err(e) => rin_bail!("bad answer from the hub ({status}): {e}"),
         };
         if !status.is_success() {
             match body.get("error").and_then(serde_json::Value::as_str) {
-                Some(error) => bail!("{error}"),
-                None => bail!("the hub answered {status}"),
+                Some(error) => rin_bail!("{error}"),
+                None => rin_bail!("the hub answered {status}"),
             }
         }
         Ok(serde_json::from_value(body)?)

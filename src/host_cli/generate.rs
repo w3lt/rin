@@ -4,12 +4,13 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use serde_json::json;
 
 use crate::compose;
-use crate::config::{self, Authentication, Config, VERSION};
 use crate::files::{random_hex, write_if_changed, write_private, write_shared};
+use crate::rin_bail;
+use crate::shared::config::{self, Authentication, Config, VERSION};
 use crate::team::{self, Team, Tokens, read_tokens};
 
 pub const DOCKERFILE: &str = include_str!("../../images/Dockerfile");
@@ -33,7 +34,7 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
         fs::read_to_string(file).with_context(|| format!("cannot read {}", file.display()))?;
     let config = config::from_yaml(&text).with_context(|| file.display().to_string())?;
     if config.version != VERSION {
-        bail!(
+        rin_bail!(
             "{}: version {} does not match this rin ({VERSION}); install rin {} or change `version:`",
             file.display(),
             config.version,
@@ -111,7 +112,7 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
 /// Every agent has `<dir>/<id>/INSTRUCTIONS.md`, and every folder is an agent.
 fn check_instructions(config: &Config, dir: &Path) -> Result<Vec<(String, PathBuf)>> {
     if !dir.is_dir() {
-        bail!("instructions folder {} not found", dir.display());
+        rin_bail!("instructions folder {} not found", dir.display());
     }
     let mut problems = Vec::new();
     let mut entries: Vec<_> = fs::read_dir(dir)
@@ -145,7 +146,7 @@ fn check_instructions(config: &Config, dir: &Path) -> Result<Vec<(String, PathBu
         }
     }
     if !problems.is_empty() {
-        bail!(
+        rin_bail!(
             "instructions don't match rin.yml:\n  {}",
             problems.join("\n  ")
         );
@@ -201,7 +202,7 @@ fn check_names(home: &Path, config: &Config) -> Result<()> {
         };
         let theirs = compose::docker_names(&other);
         if let Some((kind, clash)) = ours.iter().find(|n| theirs.contains(n)) {
-            bail!(
+            rin_bail!(
                 "team {:?} would use the Docker {kind} name {clash:?}, which team {name:?} already uses: rename the team or an agent",
                 config.name
             );

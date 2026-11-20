@@ -6,10 +6,10 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::proto::{Event, Kind};
+use crate::rinerrln;
 use anyhow::{Context, Result};
 use rusqlite::{Connection, params};
-
-use crate::proto::{Event, Kind};
 
 fn kind_str(kind: Kind) -> &'static str {
     match kind {
@@ -105,7 +105,7 @@ impl Db {
             Ok(_) => conn.last_insert_rowid(),
             Err(e) => {
                 // The log must never take messaging down with it.
-                eprintln!("rin hub: cannot write log: {e}");
+                rinerrln!("rin hub: cannot write log: {e}");
                 0
             }
         }

@@ -8,27 +8,54 @@
     allow(dead_code)
 )]
 
+mod default_config;
+
+use crate::rin_bail;
+use default_config::{default_max_hops, default_max_sessions, default_timeout};
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
-
 /// `rin-schema.json`, embedded so every `rin` checks configs the same way.
-pub const SCHEMA: &str = include_str!("../rin-schema.json");
+pub const SCHEMA: &str = include_str!("../../rin-schema.json");
 
 /// The version of this `rin` binary; a team's `version:` must match it exactly.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub const NOT_A_RIN_CONFIG: &str = r#"not a Rin config: "rin" must be "tohsaka""#;
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Tohsaka;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
-    pub rin: String,
+    pub rin: Tohsaka,
     pub name: String,
     pub version: String,
     #[serde(default)]
     pub messaging: Messaging,
     pub agents: Vec<Agent>,
+}
+
+impl Serialize for Tohsaka {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str("tohsaka")
+    }
+}
+
+impl<'de> Deserialize<'de> for Tohsaka {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match String::deserialize(deserializer)?.as_str() {
+            "tohsaka" => Ok(Tohsaka),
+            _ => Err(serde::de::Error::custom("expected 'tohsaka'")),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -49,24 +76,12 @@ impl Default for Messaging {
     }
 }
 
-fn default_timeout() -> String {
-    "30m".into()
-}
-
-fn default_max_hops() -> u32 {
-    5
-}
-
-fn default_max_sessions() -> u32 {
-    3
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Agent {
     pub id: String,
     #[serde(rename = "type")]
-    pub kind: AgentType,
+    pub agent_type: AgentType,
     pub label: String,
     pub harness: Harness,
     pub authentication: Authentication,
@@ -105,6 +120,106 @@ pub enum Harness {
 pub enum Authentication {
     Subscription,
     ApiKey,
+}
+
+impl Agent {
+    /// This is ONLY used in Config::init. Use your FUCKING EYE to read BEFORE calling it anywhere else.
+    fn dummy_leader() -> (Agent, String) {
+        (
+            Agent {
+                id: "rinlead".to_string(),
+                agent_type: AgentType::Leader,
+                label: "Rin Lead".to_string(),
+                harness: Harness::ClaudeCode,
+                authentication: Authentication::Subscription,
+                model: "claude-5.5-opus".to_string(),
+                max_sessions: default_max_sessions(),
+                resources: Resources {
+                    cpus: serde_json::Number::from(1),
+                    ram: "2g".to_string(),
+                },
+            },
+            "# Rin — Chief Architect
+
+You lead this team.
+Break work down and delegate to the right teammate with the `send_message` tool; `list_agents` shows who is on the team and how busy they are.
+Review what comes back before you report to the user."
+                .to_string()
+        )
+    }
+
+    fn dummy_backend() -> (Agent, String) {
+        (
+            Agent {
+                id: "backend".to_string(),
+                agent_type: AgentType::Member,
+                label: "Backend Engineer".to_string(),
+                harness: Harness::Codex,
+                authentication: Authentication::Subscription,
+                model: "gpt-6-luna".to_string(),
+                max_sessions: default_max_sessions(),
+                resources: Resources {
+                    cpus: serde_json::Number::from(1),
+                    ram: "2g".to_string(),
+                },
+            },
+            "# Backend Engineer
+
+You own APIs, data and services.
+
+To message a teammate, run `rin send <id> \"<text>\"` in the shell: it waits and prints their reply.
+`rin agents` lists the team."
+                .to_string(),
+        )
+    }
+
+    fn dummy_frontend() -> (Agent, String) {
+        (
+            Agent {
+                id: "frontend".to_string(),
+                agent_type: AgentType::Member,
+                label: "Front-end Engineer".to_string(),
+                harness: Harness::Antigravity,
+                authentication: Authentication::Subscription,
+                model: "gemini-3.8-flash".to_string(),
+                max_sessions: default_max_sessions(),
+                resources: Resources {
+                    cpus: serde_json::Number::from(1),
+                    ram: "2g".to_string(),
+                },
+            },
+            "# Frontend Engineer
+
+You own the user interface. Use `send_message` to ask teammates for what you
+need; `list_agents` shows the team."
+                .to_string(),
+        )
+    }
+
+    fn dummy_devops() -> (Agent, String) {
+        (
+            Agent {
+                id: "devops".to_string(),
+                agent_type: AgentType::Member,
+                label: "DevOps Engineer".to_string(),
+                harness: Harness::Pi,
+                authentication: Authentication::ApiKey,
+                model: "ollama/inkling-2-small".to_string(),
+                max_sessions: default_max_sessions(),
+                resources: Resources {
+                    cpus: serde_json::Number::from(1),
+                    ram: "2g".to_string(),
+                },
+            },
+            "# DevOps Engineer
+
+You own infrastructure, CI/CD and deployments.
+
+To message a teammate, run `rin send <id> \"<text>\"` in the shell: it waits and prints their reply.
+`rin agents` lists the team."
+                .to_string(),
+        )
+    }
 }
 
 impl AgentType {
@@ -177,6 +292,28 @@ pub fn format_duration(d: Duration) -> String {
 }
 
 impl Config {
+    pub fn init(name: String) -> (Config, Vec<String>) {
+        let (leader, leader_instructions) = Agent::dummy_leader();
+        let (backend, backend_instruction) = Agent::dummy_backend();
+        let (frontend, frontend_instruction) = Agent::dummy_frontend();
+        let (devops, devops_instruction) = Agent::dummy_devops();
+        (
+            Config {
+                rin: Tohsaka,
+                name,
+                version: VERSION.to_string(),
+                messaging: Messaging::default(),
+                agents: vec![leader, backend, frontend, devops],
+            },
+            vec![
+                leader_instructions,
+                backend_instruction,
+                frontend_instruction,
+                devops_instruction,
+            ],
+        )
+    }
+
     pub fn agent(&self, id: &str) -> Option<&Agent> {
         self.agents.iter().find(|a| a.id == id)
     }
@@ -190,7 +327,7 @@ impl Config {
     /// Checks JSON Schema can't express.
     fn check(&self) -> anyhow::Result<()> {
         if parse_minutes(&self.messaging.timeout).is_none() {
-            anyhow::bail!(
+            rin_bail!(
                 "messaging.timeout: {} is longer than {MAX_MINUTES}m (a year)",
                 self.messaging.timeout
             );
@@ -198,10 +335,14 @@ impl Config {
         let mut seen = std::collections::HashSet::new();
         for agent in &self.agents {
             if !seen.insert(agent.id.as_str()) {
-                anyhow::bail!("duplicate agent id: {:?}", agent.id);
+                rin_bail!("duplicate agent id: {:?}", agent.id);
             }
         }
         Ok(())
+    }
+
+    pub fn dummy_team_name() -> String {
+        "rinteam".to_string()
     }
 }
 
@@ -227,7 +368,7 @@ pub fn from_json_file(path: &std::path::Path) -> anyhow::Result<Config> {
 #[cfg(any(feature = "host", feature = "hub"))]
 pub fn from_value(value: serde_json::Value) -> anyhow::Result<Config> {
     if value.get("rin").and_then(serde_json::Value::as_str) != Some("tohsaka") {
-        anyhow::bail!(NOT_A_RIN_CONFIG);
+        rin_bail!("{NOT_A_RIN_CONFIG}");
     }
     // Compiled once: `rin generate` reads every other team's config too.
     static VALIDATOR: std::sync::LazyLock<jsonschema::Validator> = std::sync::LazyLock::new(|| {
@@ -248,18 +389,26 @@ pub fn from_value(value: serde_json::Value) -> anyhow::Result<Config> {
         })
         .collect();
     if !problems.is_empty() {
-        anyhow::bail!("invalid config:\n{}", problems.join("\n"));
+        rin_bail!("invalid config:\n{}", problems.join("\n"));
     }
     let config: Config = serde_json::from_value(value)?;
     config.check()?;
     Ok(config)
 }
 
+#[cfg(feature = "host")]
+pub fn rin_yaml_schema_directive() -> String {
+    format!(
+        "# yaml-language-server: $schema=https://raw.githubusercontent.com/w3lt/rin/refs/tags/v{}/rin-schema.json",
+        VERSION
+    ).to_string()
+}
+
 #[cfg(all(test, feature = "host"))]
 mod tests {
     use super::*;
 
-    const EXAMPLE: &str = include_str!("../examples/team/rin.yml");
+    const EXAMPLE: &str = include_str!("../../examples/team/rin.yml");
 
     fn err(yaml: &str) -> String {
         format!(
@@ -424,5 +573,64 @@ mod tests {
         assert_eq!(format_duration(Duration::from_secs(59)), "59s");
         assert_eq!(format_duration(Duration::from_secs(61)), "1m");
         assert_eq!(format_duration(Duration::from_secs(3700)), "1h1m");
+    }
+
+    #[test]
+    fn tohsaka_is_the_only_rin() {
+        assert_eq!(
+            serde_json::to_value(Tohsaka).unwrap(),
+            serde_json::json!("tohsaka")
+        );
+        assert_eq!(
+            serde_json::from_value::<Tohsaka>(serde_json::json!("tohsaka")).unwrap(),
+            Tohsaka
+        );
+        assert_eq!(
+            serde_json::from_str::<Tohsaka>(r#""tohsaka""#).unwrap(),
+            Tohsaka
+        );
+        assert!(serde_json::from_value::<Tohsaka>(serde_json::json!("saber")).is_err());
+        assert!(serde_json::from_value::<Tohsaka>(serde_json::json!(1)).is_err());
+    }
+
+    #[test]
+    fn init_makes_a_valid_team() {
+        let (config, instructions) = Config::init("my-team".into());
+        assert_eq!(config.rin, Tohsaka);
+        assert_eq!(config.name, "my-team");
+        assert_eq!(config.version, VERSION);
+        assert_eq!(config.messaging, Messaging::default());
+        assert_eq!(instructions.len(), config.agents.len());
+
+        let back = from_value(serde_json::to_value(&config).unwrap()).unwrap();
+        assert_eq!(back, config);
+    }
+
+    #[test]
+    fn init_instructions_are_unindented_markdown() {
+        let (config, instructions) = Config::init("my-team".into());
+        for (agent, text) in config.agents.iter().zip(&instructions) {
+            assert!(text.starts_with("# "), "{}: {text:?}", agent.id);
+            for line in text.lines() {
+                assert!(!line.starts_with(' '), "{}: indented {line:?}", agent.id);
+            }
+        }
+    }
+
+    #[test]
+    fn dummy_team_name_is_a_valid_name() {
+        let (config, _) = Config::init(Config::dummy_team_name());
+        assert_eq!(
+            from_value(serde_json::to_value(&config).unwrap()).unwrap(),
+            config
+        );
+    }
+
+    #[test]
+    fn schema_directive_points_at_this_versions_schema() {
+        let directive = rin_yaml_schema_directive();
+        assert!(directive.starts_with("# yaml-language-server: $schema=https://"));
+        assert!(directive.ends_with(&format!("/v{VERSION}/rin-schema.json")));
+        assert!(!directive.contains('\n'));
     }
 }

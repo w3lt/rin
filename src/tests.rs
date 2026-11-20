@@ -11,11 +11,11 @@ use serde_json::json;
 
 use crate::agent_runtime::Runtime;
 use crate::client::Client;
-use crate::config::Harness;
 use crate::hub::auth::{Principal, Resolver};
 use crate::hub::db::Db;
 use crate::hub::{Hub, HubError};
 use crate::proto::{Kind, SendRequest};
+use crate::shared::config::{self, Harness};
 
 /// Answers `<first prompt line> | hops=<RIN_HOPS> | <message>`; `sleep N …` sleeps N seconds
 /// (in a child process, whose pid it records), `fail` exits 3, `bg` leaves a
@@ -69,8 +69,8 @@ async fn team(name: &str, timeout: Duration) -> Team {
                 "harness": "claude-code", "authentication": "subscription", "model": "fake-model",
                 "maxSessions": max, "resources": { "cpus": 1, "ram": "1g" } })
     };
-    let config = crate::config::from_value(json!({
-        "rin": "tohsaka", "name": "e2e", "version": crate::config::VERSION,
+    let config = config::from_value(json!({
+        "rin": "tohsaka", "name": "e2e", "version": config::VERSION,
         "messaging": { "timeout": "1m", "maxHops": 3 },
         "agents": [agent("a", 1), agent("b", 3), agent("down", 1), agent("stale", 1)],
     }))
@@ -285,14 +285,20 @@ async fn failed_sessions_report_their_last_lines() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn timeout_kills_the_session() {
-    let t = team("timeout", Duration::from_secs(1)).await;
+    let t = Arc::new(team("timeout", Duration::from_secs(3)).await);
     let started = Instant::now();
-    let err = t
-        .user()
-        .send("b", "sleep 30", 1)
-        .await
-        .unwrap_err()
-        .to_string();
+    let send = {
+        let t = t.clone();
+        tokio::spawn(async move { t.user().send("b", "sleep 30", 1).await })
+    };
+    while std::fs::read_to_string(t.dir.join("sleep.pid")).map_or(true, |pid| pid.is_empty()) {
+        assert!(
+            !send.is_finished(),
+            "the session, ended before it started sleeping"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let err = send.await.unwrap().unwrap_err().to_string();
     assert!(err.starts_with("timeout"), "{err}");
     assert!(
         started.elapsed() < Duration::from_secs(5),

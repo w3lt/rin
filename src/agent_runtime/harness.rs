@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::config::Harness;
+use crate::shared::config::Harness;
 
 pub struct Invocation {
     pub program: &'static str,

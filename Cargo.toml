@@ -50,6 +50,7 @@ reqwest = { version = "0.13.5", default-features = false, features = ["json"] }
 # host
 clap_complete = { version = "4.6.12", optional = true }
 serde-saphyr = { version = "2.1.1", default-features = false, features = [
+    "serialize",
     "deserialize",
 ], optional = true }
 getrandom = { version = "0.4.3", optional = true }
