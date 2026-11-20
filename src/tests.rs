@@ -285,14 +285,20 @@ async fn failed_sessions_report_their_last_lines() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn timeout_kills_the_session() {
-    let t = team("timeout", Duration::from_secs(1)).await;
+    let t = Arc::new(team("timeout", Duration::from_secs(3)).await);
     let started = Instant::now();
-    let err = t
-        .user()
-        .send("b", "sleep 30", 1)
-        .await
-        .unwrap_err()
-        .to_string();
+    let send = {
+        let t = t.clone();
+        tokio::spawn(async move { t.user().send("b", "sleep 30", 1).await })
+    };
+    while std::fs::read_to_string(t.dir.join("sleep.pid")).map_or(true, |pid| pid.is_empty()) {
+        assert!(
+            !send.is_finished(),
+            "the session, ended before it started sleeping"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let err = send.await.unwrap().unwrap_err().to_string();
     assert!(err.starts_with("timeout"), "{err}");
     assert!(
         started.elapsed() < Duration::from_secs(5),
