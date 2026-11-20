@@ -335,7 +335,7 @@ fn ensure_project_dir(path: &Path) -> Result<()> {
         rin_bail!("{} is not a directory", path.display());
     }
 
-    fs::create_dir_all(&path).with_context(|| format!("Cannot create {}", path.display()))?;
+    fs::create_dir_all(path).with_context(|| format!("Cannot create {}", path.display()))?;
     Ok(())
 }
 
