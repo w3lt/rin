@@ -6,7 +6,7 @@
 
 **One config file. One command. A whole team of AI agents on your machine.**
 
-*「 You write the config. I'll take care of the rest. 」*
+_「 You write the config. I'll take care of the rest. 」_
 
 <br>
 
@@ -28,14 +28,14 @@
 
 One AI agent is handy. A whole **team** of them, with an architect who plans, engineers who build, and everyone talking to each other, gets a lot more done. Putting that team together by hand is the boring part.
 
-**Rin** (yes, *that* Tohsaka) does the boring part. You describe your team in one file, and she brings it to life on your own machine:
+**Rin** (yes, _that_ Tohsaka) does the boring part. You describe your team in one file, and she brings it to life on your own machine:
 
 - 🏠 &nbsp;**A room for everyone.** Each agent lives in its own Docker container and keeps its home when the team restarts.
 - 🧠 &nbsp;**Any brain you like.** Each agent runs Claude Code, Codex, Antigravity or pi. Mix them freely in one team.
 - 👑 &nbsp;**One leads, everyone talks.** A leader splits up the work and hands it out. You can still talk to any agent yourself, and they can message each other.
 - 🔁 &nbsp;**Same team, every time.** The same config brings back the same team, on any machine.
 
-> *"Don't get the wrong idea. I'm not doing this for you. A good team simply deserves a proper setup."*<br>
+> _"Don't get the wrong idea. I'm not doing this for you. A good team simply deserves a proper setup."_<br>
 > — Rin, probably
 
 ## 🎭 The cast
@@ -46,11 +46,11 @@ The example in [`examples/team`](examples/team) stars three agents:
 
 <img src="assets/team.svg" alt="You talk to rin, the leader. rin delegates to backend and frontend, then reviews their work. The agents message each other, and you can talk to any of them directly. Every agent lives in its own Docker container." width="100%">
 
-| | Agent | Role | Runs |
-|:-:|:--|:--|:--|
-| 👑 | **`rin`** | **Chief Architect.** Leads the team: breaks work down, delegates, and reviews what comes back. | Claude Code |
-| ⚙️ | **`backend`** | **Backend Engineer.** Owns APIs, data and services. | pi |
-| 🎨 | **`frontend`** | **Frontend Engineer.** Owns the user interface. | Codex |
+|     | Agent          | Role                                                                                           | Runs        |
+| :-: | :------------- | :--------------------------------------------------------------------------------------------- | :---------- |
+| 👑  | **`rin`**      | **Chief Architect.** Leads the team: breaks work down, delegates, and reviews what comes back. | Claude Code |
+| ⚙️  | **`backend`**  | **Backend Engineer.** Owns APIs, data and services.                                            | pi          |
+| 🎨  | **`frontend`** | **Frontend Engineer.** Owns the user interface.                                                | Codex       |
 
 The casting is up to you. Every agent is a few lines in `rin.yml`:
 
@@ -71,7 +71,7 @@ agents:
 
 <sup>EPISODE 3 ・ 第三話</sup>
 
-> *"A proper magus prepares before the ritual."*
+> _"A proper magus prepares before the ritual."_
 
 **What you need:** [Docker](https://docs.docker.com/get-started/get-docker/) with Compose 2.24 or later (Docker Desktop, or Docker Engine with the Compose plugin), and Rust's [`cargo`](https://rustup.rs/) to install Rin.
 
@@ -141,17 +141,17 @@ rin down       # good night, everyone
 
 <sup>EPISODE 4 ・ 第四話</sup>
 
-| Spell | What it does |
-|:--|:--|
-| `rin generate --instructions <dir>` | Checks `rin.yml` and prepares the team. Makes it the current team. |
-| `rin up` | Starts the team. Builds the images the first time. |
-| `rin down` | Stops the team. Homes and the message log are kept. |
-| `rin shell <id>` | Opens a shell in an agent's container. |
-| `rin send <id> "<text>"` | Messages an agent and prints its reply. |
-| `rin agents` | Lists the team's agents. |
-| `rin status` | Shows each agent's state, sessions and queues, and warns about deadlocks. |
-| `rin log [-f] [<id>]` | Shows the message history. `-f` keeps following, `<id>` narrows it to one agent. |
-| `rin use <name>` | Switches the current team. |
+| Spell                               | What it does                                                                     |
+| :---------------------------------- | :------------------------------------------------------------------------------- |
+| `rin generate --instructions <dir>` | Checks `rin.yml` and prepares the team. Makes it the current team.               |
+| `rin up`                            | Starts the team. Builds the images the first time.                               |
+| `rin down`                          | Stops the team. Homes and the message log are kept.                              |
+| `rin shell <id>`                    | Opens a shell in an agent's container.                                           |
+| `rin send <id> "<text>"`            | Messages an agent and prints its reply.                                          |
+| `rin agents`                        | Lists the team's agents.                                                         |
+| `rin status`                        | Shows each agent's state, sessions and queues, and warns about deadlocks.        |
+| `rin log [-f] [<id>]`               | Shows the message history. `-f` keeps following, `<id>` narrows it to one agent. |
+| `rin use <name>`                    | Switches the current team.                                                       |
 
 ## 🏯 House rules
 
@@ -172,8 +172,9 @@ rin down       # good night, everyone
 <br>
 
 ```sh
-cargo test --all-features    # unit tests + hub/runtime end to end with a fake harness
-cargo clippy --all-features --all-targets
+scripts/verify         # fmt, clippy, tests (incl. hub/runtime end to end with a fake harness), image build
+scripts/verify matrix  # + clippy on every feature subset; what the pre-commit hook runs
+git config core.hooksPath .githooks   # once per clone, to enable the hooks
 ```
 
 The binary has three feature sets: `host` (default: the commands above),
@@ -196,7 +197,7 @@ the same branch rebuild with
 
 Licensed under MIT or Apache-2.0, whichever you prefer.
 
-*She is the best waifu, btw.* &nbsp;(๑•̀ㅂ•́)و✧
+_She is the best waifu, btw._ &nbsp;(๑•̀ㅂ•́)و✧
 
 <sub>A fan-named project, not affiliated with or endorsed by TYPE-MOON. The artwork in this README is original.</sub>
 
