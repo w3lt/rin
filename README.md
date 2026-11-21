@@ -174,6 +174,7 @@ rin down       # good night, everyone
 ```sh
 scripts/verify.sh        # fmt, clippy, tests (incl. hub/runtime end to end with a fake harness), image build
 scripts/verify.sh matrix # + clippy on every feature subset; what the pre-commit hook runs
+scripts/verify.sh docker # needs Docker: a throwaway team up and down, images built from HEAD as pushed
 git config core.hooksPath .githooks   # once per clone, to enable the hooks
 ```
 

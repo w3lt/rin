@@ -10,8 +10,11 @@
 - Git hooks live in `.githooks/`; enable them once per clone with `git config core.hooksPath .githooks`.
   `pre-commit` runs `scripts/verify.sh matrix`; agents must not bypass it with `--no-verify`.
   A cold build takes about two minutes, so give `git commit` and `scripts/verify.sh` a 10 minute timeout.
-- Nothing here runs Docker or Linux. Say so when a change touches
-  `src/compose.rs`, `images/Dockerfile` or container-only paths, rather than claiming them verified.
+- The checks above run no Docker and, off Linux, skip `cfg(target_os = "linux")` code. For changes to
+  `src/compose.rs`, `images/Dockerfile` or container-only paths, run `scripts/verify.sh docker` where Docker
+  is available: it starts a throwaway team and checks every service stays up. HEAD must be pushed (the images
+  build `rin` from GitHub at it), and a cold run can pass 10 minutes, so run it in the background.
+  Without Docker, say those paths are unverified rather than claiming them verified.
 
 ## Gotchas
 
