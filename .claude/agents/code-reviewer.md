@@ -39,7 +39,7 @@ Find the change yourself; you start without the author's context, which is the p
 ## Rules
 
 - Do not modify source, config or git state (no commit, stash, checkout, reset).
-- You may run `scripts/verify` (`fast`, default, `matrix`; Bash timeout 600000 ms) and `cargo test <name>`;
+- You may run `scripts/verify.sh` (`fast`, default, `matrix`; Bash timeout 600000 ms) and `cargo test <name>`;
   build artifacts are fine. No network, Docker or other external state.
 - Report only issues the change introduces or makes worse. No style nits, no
   speculative improvements.
@@ -55,5 +55,5 @@ Why: the failure, with the input or state that triggers it.
 Fix: the correction, in a sentence or a small snippet.
 ```
 
-End with `Verify: <scripts/verify result, or "not run">`.
+End with `Verify: <scripts/verify.sh result, or "not run">`.
 If nothing meaningful is wrong, say `No issues found.` and stop.

@@ -20,7 +20,7 @@ You check that Rin's docs match its code. You never edit anything.
   example YAML, the "Working on Rin itself" section.
 - `examples/team/rin.yml` and `examples/team/agents/*/INSTRUCTIONS.md`.
 - `rin-schema.json` descriptions and defaults versus `src/config.rs`.
-- `AGENTS.md` commands versus `scripts/verify`.
+- `AGENTS.md` commands versus `scripts/verify.sh`.
 
 Start from what changed: `git diff main...HEAD --stat`, `git diff HEAD --stat` and untracked files in `git status --short`.
 Check only what those changes could make stale, unless the caller asks for a full sweep.

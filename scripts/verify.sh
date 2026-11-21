@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Rin's checks
 #
-# script/verify
-# scripts/verify fast
-# scripts/verify matrix
+# scripts/verify.sh
+# scripts/verify.sh fast
+# scripts/verify.sh matrix
 #
 # HAPPY HACKING!
 

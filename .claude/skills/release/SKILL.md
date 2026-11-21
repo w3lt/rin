@@ -28,7 +28,7 @@ Current version:
    - `README.md`: the install command's `--tag vX.Y.Z`.
    - Then `git grep -n '<old version>'` and decide for each hit whether it is a pin. Test
      fixtures such as the `"v0.1.0"` git revision in `src/host_cli/generate.rs` are not.
-4. Run `scripts/verify matrix`, and `cargo publish --dry-run --locked --package tohsaka --allow-dirty`
+4. Run `scripts/verify.sh matrix`, and `cargo publish --dry-run --locked --package tohsaka --allow-dirty`
    (dirty because the manifest is uncommitted).
 5. Commit the non-manifest files as `release: X.Y.Z`.
 6. Hand over to the user, and do not do these yourself:
