@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+# Enable once per clone: git config core.hooksPath .githooks
+
+set -euo pipefail
+
+# Claude Code marks its shells with CLAUDECODE=1
+if [ -n "${CLAUDECODE:-}" ]; then
+    manifests="$(git diff --cached --no-renames --name-only | grep -E '(^|/)Cargo\.(toml|lock)$' || true)"
+    if [ -n "$manifests" ]; then
+        echo "pre-commit: agents must not commit manifest files:" >&2
+        printf '%s\n' "$manifests" | sed 's/^/  /' >&2
+        echo "Unstage them (git restore --staged <file>), commit the rest, and tell the human which manifest changes they need to commit." >&2
+        exit 1
+    fi
+fi
+
+exec "$(git rev-parse --show-toplevel)/scripts/verify.sh" matrix
