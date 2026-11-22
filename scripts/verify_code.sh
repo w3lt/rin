@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Rin's checks
 #
-# script/verify
-# scripts/verify fast
-# scripts/verify matrix
+# scripts/verify_code.sh
+# scripts/verify_code.sh fast
+# scripts/verify_code.sh matrix
 #
 # HAPPY HACKING!
 
@@ -41,7 +41,7 @@ step() {
 case "$mode" in
 fast | ci | matrix) ;;
 *)
-    echo "usage: scripts/verify.sh [fast|ci|matrix]" >&2
+    echo "usage: scripts/verify_code.sh [fast|ci|matrix]" >&2
     exit 2
     ;;
 esac

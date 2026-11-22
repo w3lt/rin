@@ -14,4 +14,4 @@ if [ -n "${CLAUDECODE:-}" ]; then
     fi
 fi
 
-exec "$(git rev-parse --show-toplevel)/scripts/verify.sh" matrix
+exec "$(git rev-parse --show-toplevel)/scripts/verify_code.sh" matrix
