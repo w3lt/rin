@@ -44,13 +44,14 @@ One AI agent is handy. A whole **team** of them, with an architect who plans, en
 
 The example in [`examples/team`](examples/team) stars four agents:
 
-<img src="assets/team.svg" alt="You talk to rin, the leader. rin delegates to backend and frontend, then reviews their work. The agents message each other, and you can talk to any of them directly. Every agent lives in its own Docker container." width="100%">
+<img src="assets/team.svg" alt="You talk to rin, the leader. rin delegates to backend, frontend and devops, then reviews their work. The agents message each other, and you can talk to any of them directly. Every agent lives in its own Docker container." width="100%">
 
 |     | Agent          | Role                                                                                           | Runs        |
 | :-: | :------------- | :--------------------------------------------------------------------------------------------- | :---------- |
 | 👑  | **`rin`**      | **Chief Architect.** Leads the team: breaks work down, delegates, and reviews what comes back. | Claude Code |
-| ⚙️  | **`backend`**  | **Backend Engineer.** Owns APIs, data and services.                                            | pi          |
-| 🎨  | **`frontend`** | **Frontend Engineer.** Owns the user interface.                                                | Codex       |
+| ⚙️  | **`backend`**  | **Backend Engineer.** Owns APIs, data and services.                                            | Codex       |
+| 🎨  | **`frontend`** | **Frontend Engineer.** Owns the user interface.                                                | Antigravity |
+| 🛠️  | **`devops`**   | **DevOps Engineer.** Owns infrastructure, CI/CD and deployments.                               | pi          |
 
 The casting is up to you. Every agent is a few lines in `rin.yml`:
 
@@ -85,7 +86,7 @@ The package is called `tohsaka`. The command you get is `rin`.
 
 ### 2 ・ Hand over the keys
 
-Only for agents that use an API key. Agents that sign in with a subscription skip this step. The example team's `backend` uses a key, so it needs `ANTHROPIC_API_KEY` here.
+Only for agents that use an API key. Agents that sign in with a subscription skip this step. The example team's `devops` uses a key, so it needs `ANTHROPIC_API_KEY` here.
 
 ```sh
 mkdir -p -m 700 ~/.rin && touch ~/.rin/keys.env && chmod 600 ~/.rin/keys.env
@@ -115,7 +116,7 @@ The first run builds the images, so there is time for tea. ☕
 
 ### 5 ・ Say hello
 
-Agents on a subscription need you to sign in once. Step into their room and run their own tool (`claude` for Rin, `codex` for `frontend`):
+Agents on a subscription need you to sign in once. Step into their room and run their own tool (`claude` for Rin, `codex` for `backend`, `agy` for `frontend`):
 
 ```sh
 rin shell rin
