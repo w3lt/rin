@@ -1,12 +1,14 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Enable once per clone: git config core.hooksPath .githooks
 
-set -euo pipefail
+set -eu
+
+staged="$(git diff --cached --no-renames --name-only)"
 
 # Claude Code marks its shells with CLAUDECODE=1
-if [ -n "${CLAUDECODE:-}" ]; then
-    manifests="$(git diff --cached --no-renames --name-only | grep -E '(^|/)Cargo\.(toml|lock)$' || true)"
-    if [ -n "$manifests" ]; then
+if [[ -n "${CLAUDECODE:-}" ]]; then
+    manifests="$(printf "%s\n" "$staged" | grep -E '(^|/)Cargo\.(toml|lock)$' || true)"
+    if [[ -n "$manifests" ]]; then
         echo "pre-commit: agents must not commit manifest files:" >&2
         printf '%s\n' "$manifests" | sed 's/^/  /' >&2
         echo "Unstage them (git restore --staged <file>), commit the rest, and tell the human which manifest changes they need to commit." >&2
@@ -14,4 +16,27 @@ if [ -n "${CLAUDECODE:-}" ]; then
     fi
 fi
 
-exec "$(git rev-parse --show-toplevel)/scripts/verify_code.sh" matrix
+# If the code doesnt change, we have nothing to verify
+if [[ -n "$staged" ]] && ! printf '%s\n' "$staged" | grep -Evq '(\.md$|^assets/|^\.claude/)'; then
+    exit 0
+fi
+
+root="$(git rev-parse --show-toplevel)"
+git_dir="$(git rev-parse --path-format=absolute --git-dir)"
+snapshot="$(mktemp -d "$git_dir/rin-pre-commit.XXXXXX")"
+tree="$(git write-tree)"
+
+trap 'rm -rf -- "$snapshot" "$snapshot.index"' 0
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+mkdir -p "$snapshot"
+
+GIT_INDEX_FILE="$snapshot.index" \
+    git --work-tree="$snapshot" read-tree --reset -u "$tree"
+
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$root/target}"
+
+cd "$snapshot"
+exec ./scripts/verify_code.sh matrix

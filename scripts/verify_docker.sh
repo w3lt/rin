@@ -11,33 +11,15 @@ cd "$(dirname "$0")/.." || exit 1
 # Set RIN_HOME to a temp dir
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/rin-verify-docker.XXXXXX")"
 RIN_HOME="$tmp/home"
+mkdir -p "$RIN_HOME"
 export RIN_HOME
 team=verify-docker
 
 lines=${VERIFY_LINES:-120}
-log="$(mktemp)"
+log="$tmp/step.log"
 trap 'rm -f "$log"' EXIT
 
-step() {
-    local name="$1"
-    shift
-    if "$@" >"$log" 2>&1; then
-        echo "ok    $name"
-    else
-        printf 'FAIL %s:' "$name"
-        printf ' %q' "$@"
-        echo
-        local half=$((lines / 2))
-        head -n "$half" "$log"
-        tail -n "$half" "$log"
-        local total
-        total="$(wc -l <"$log" | tr -d ' ')"
-        if [ "$total" -gt "$lines" ]; then
-            echo "... ($((total - lines)) more lines; rerun the command above for all of it)"
-        fi
-        exit 1
-    fi
-}
+source scripts/lib/step.sh
 
 compose() {
     docker compose -p "rin-$team" -f "$RIN_HOME/teams/$team/docker-compose.yml" "$@"
@@ -49,8 +31,11 @@ cleanup() {
         [[ "$status" -ne 0 ]] && compose logs --no-color --tail 30 2>&1
         compose down -v --remove-orphans >/dev/null 2>&1
     fi
-    rm -rf "$tmp" "$log"
+    rm -rf "$tmp"
+    exit "$status"
 }
+
+trap cleanup EXIT
 
 team_running() {
     local states status
@@ -75,15 +60,16 @@ wait_running() {
 }
 
 docker_smoke() {
-    local rev="$(git rev-parse HEAD)"
+    local rev
+    rev="$(git rev-parse HEAD)"
     step docker docker info
     if [[ -n "$(docker ps -a -q --filter "name=rin-$team")$(docker volume ls -q --filter "name=rin-$team-")" ]]; then
-        echo "FAIL leaftovers: containers or volumes named rin-$team* exist; remove them first (docker compose -p rin-$team down -v)"
+        echo "FAIL leftovers: containers or volumes named rin-$team* exist; remove them first (docker compose -p rin-$team down -v)"
         exit 1
     fi
 
     if [[ -z "$(git branch -r --contains "$rev")" ]]; then
-        echo "FAIL push: no remote branch has HEAD ($rev); the image build rin from Github at it, so push first"
+        echo "FAIL push: no remote branch has HEAD ($rev); the images build rin from Github at it, so push first"
         exit 1
     fi
 

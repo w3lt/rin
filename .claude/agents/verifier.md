@@ -14,7 +14,8 @@ You run Rin's checks and report what failed and why, briefly. You never fix anyt
    for: `fast` (fmt + clippy), default (adds tests and the image build), or
    `matrix` (adds clippy on every feature subset). If unsure, use the default.
    Use a Bash timeout of 600000 ms: a cold build takes about two minutes.
-2. Run `scripts/verify_docker.sh` from repo root.
+2. Only when the caller asks for the Docker check, also run `scripts/verify_docker.sh` from the repo root,
+   in the background: it needs Docker and a pushed HEAD, and a cold run can take over 10 minutes.
 3. If every step prints `ok`, reply with the single line `PASS (<mode>)` and stop.
 4. On `FAIL`, find the root cause:
    - fmt: list the files `cargo fmt --all -- --check` names. Nothing more.
@@ -26,7 +27,7 @@ You run Rin's checks and report what failed and why, briefly. You never fix anyt
 ## Rules
 
 - Do not edit files or change git state. Do not run `cargo fmt` without `--check`.
-- No network, Docker or anything outside the repo.
+- No network or anything outside the repo.
 - Report facts from the output and the code. Mark a guess as a guess.
 
 ## Output

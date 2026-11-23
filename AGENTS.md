@@ -5,11 +5,12 @@
 - `scripts/verify_code.sh`: fmt, clippy, tests and the image build (`--no-default-features --features hub,agent`),
   the release workflow's build checks (not its publish dry run). `scripts/verify_code.sh fast` is fmt + clippy;
   `scripts/verify_code.sh matrix` adds clippy on every feature subset.
-- `scripts/verify_docker.sh`:
+- `scripts/verify_docker.sh`: needs Docker; starts a throwaway team and checks every service stays up (see below).
 - One test: `cargo test --all-features <name>`. Plain `cargo test` skips the
   end-to-end tests in `src/tests.rs`, which need all three features.
 - Git hooks live in `.githooks/`; enable them once per clone with `git config core.hooksPath .githooks`.
-  `pre-commit` runs `scripts/verify_code.sh matrix`; agents must not bypass it with `--no-verify`.
+  `pre-commit` runs `scripts/verify_code.sh matrix` on the staged files (it skips commits that only touch
+  Markdown, `assets/` or `.claude/`); agents must not bypass it with `--no-verify`.
   A cold build takes about two minutes, so give `git commit` and `scripts/verify_code.sh` a 10 minute timeout.
 - Nothing here runs Docker or Linux. Say so when a change touches
   `src/compose.rs`, `images/Dockerfile` or container-only paths, run `scripts/verify_docker.sh` where Docker
