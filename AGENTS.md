@@ -12,7 +12,7 @@
   `pre-commit` runs `scripts/verify_code.sh matrix`; agents must not bypass it with `--no-verify`.
   A cold build takes about two minutes, so give `git commit` and `scripts/verify_code.sh` a 10 minute timeout.
 - Nothing here runs Docker or Linux. Say so when a change touches
-  `src/compose.rs`, `images/Dockerfile` or container-only paths, run `scripts/verify.sh docker` where Docker
+  `src/compose.rs`, `images/Dockerfile` or container-only paths, run `scripts/verify_docker.sh` where Docker
   is available: it starts a throwaway team and checks every service stays up. HEAD must be pushed (the images
   build `rin` from GitHub at it), and a cold run can pass 10 minutes, so run it in the background.
   Without Docker, say those paths are unverified rather than claiming them verified.
