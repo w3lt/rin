@@ -224,7 +224,10 @@ jobs:
             exit 0
           fi
 
-          sha() { sha256sum "../dist/rin-$1.tar.gz" | cut -d' ' -f1; }
+          sha() {
+            local platform="$1"
+            sha256sum "../dist/rin-$platform.tar.gz" | cut -d' ' -f1
+          }
           MACOS_ARM="$(sha aarch64-apple-darwin)"
           LINUX_INTEL="$(sha x86_64-unknown-linux-musl)"
           LINUX_ARM="$(sha aarch64-unknown-linux-musl)"

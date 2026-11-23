@@ -10,8 +10,8 @@ step() {
         printf ' %q' "$@"
         echo
         local half=$((lines / 2))
-        total="$(wc -l <"$log" | tr -d ' ')"
-        if [ "$total" -le "$lines" ]; then
+        local total="$(wc -l <"$log" | tr -d ' ')"
+        if [[ "$total" -le "$lines" ]]; then
             cat "$log"
         else
             head -n "$half" "$log"

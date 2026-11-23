@@ -22,12 +22,17 @@ fail() {
     failed=$((failed + 1))
 }
 
-have() { command -v "$1" >/dev/null 2>&1; }
+have() {
+    local cmd="$1"
+    command -v "$cmd" >/dev/null 2>&1
+}
 
 version_of() { sed 's/[^0-9]*\([0-9][0-9A-Za-z.+_-]*\).*/\1/;q'; }
 
 ver_ge() {
-    printf '%s\n%s\n' "$2" "$1" | awk -F. '
+    local current_version="$1"
+    local minimum_version="$2"
+    printf '%s\n%s\n' "$minimum_version" "$current_version" | awk -F. '
         NR == 1 { for (i = 1; i <= 3; i++) want[i] = $i + 0 }
         NR == 2 {
             for (i = 1; i <= 3; i++) {
@@ -113,10 +118,10 @@ if have docker; then
         warn compose "plugin not found; need Compose $compose_min or later"
     fi
 else
-    warn docker "not found; needed for scripts/verify_docker.sh docker and rin up"
+    warn docker "not found; needed for scripts/verify_docker.sh and rin up"
 fi
 
-if [ "$failed" -ne 0 ]; then
+if [[ "$failed" -ne 0 ]]; then
     echo "$failed required tool(s) missing or too old"
     exit 1
 fi
