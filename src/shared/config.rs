@@ -436,8 +436,8 @@ mod tests {
             r#"{"timeout":"30m","maxHops":5}"#
         );
         let sessions: Vec<_> = config.agents.iter().map(|a| a.max_sessions).collect();
-        assert_eq!(sessions, [3, 3, 3]);
-        assert_eq!(json["agents"][0]["resources"]["cpus"], serde_json::json!(2));
+        assert_eq!(sessions, [3, 3, 3, 3]);
+        assert_eq!(json["agents"][0]["resources"]["cpus"], serde_json::json!(1));
         assert_eq!(config.messaging.timeout(), Duration::from_secs(1800));
     }
 
@@ -490,31 +490,28 @@ mod tests {
             "harness: pi\n    authentication: apiKey",
             "harness: pi\n    authentication: subscription",
         );
-        assert!(err(&yaml).contains("/agents/1/authentication"));
+        assert!(err(&yaml).contains("/agents/3/authentication"));
     }
 
     #[test]
     fn rejects_bad_resources() {
+        let first = "      cpus: 1\n      ram: 2g\n\n  - id: backend";
         assert!(
             err(&edit(
-                "cpus: 2, ram: 4g }\n\n  - id: backend",
-                "cpus: 2, ram: 4GB }\n\n  - id: backend"
+                first,
+                "      cpus: 1\n      ram: 2GB\n\n  - id: backend"
             ))
             .contains("/agents/0/resources/ram")
         );
         assert!(
             err(&edit(
-                "cpus: 2, ram: 4g }\n\n  - id: backend",
-                "cpus: 0, ram: 4g }\n\n  - id: backend"
+                first,
+                "      cpus: 0\n      ram: 2g\n\n  - id: backend"
             ))
             .contains("/agents/0/resources/cpus")
         );
         assert!(
-            err(&edit(
-                "cpus: 2, ram: 4g }\n\n  - id: backend",
-                "ram: 4g }\n\n  - id: backend"
-            ))
-            .contains("/agents/0/resources")
+            err(&edit(first, "      ram: 2g\n\n  - id: backend")).contains("/agents/0/resources")
         );
     }
 
@@ -533,17 +530,17 @@ mod tests {
 
     #[test]
     fn rejects_missing_model_and_unknown_fields() {
-        assert!(err(&edit("    model: gpt-5-codex\n", "")).contains("/agents/2"));
+        assert!(err(&edit("    model: gemini-3.8-flash\n", "")).contains("/agents/2"));
         assert!(err(&edit("rin: tohsaka", "rin: tohsaka\nfoo: 1")).contains("foo"));
         assert!(err(&edit("maxHops: 5", "maxHops: 5\n  foo: 1")).contains("foo"));
         assert!(
             err(&edit(
-                "model: gpt-5-codex",
-                "model: gpt-5-codex\n    foo: 1"
+                "model: gemini-3.8-flash",
+                "model: gemini-3.8-flash\n    foo: 1"
             ))
             .contains("foo")
         );
-        assert!(err(&edit("ram: 4g }", "ram: 4g, gpu: 1 }")).contains("gpu"));
+        assert!(err(&edit("ram: 2g\n", "ram: 2g\n      gpu: 1\n")).contains("gpu"));
     }
 
     #[test]

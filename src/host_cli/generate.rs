@@ -374,7 +374,7 @@ mod tests {
             let root =
                 std::env::temp_dir().join(format!("rin-generate-{name}-{}", std::process::id()));
             let _ = fs::remove_dir_all(&root);
-            for id in ["rin", "backend", "frontend"] {
+            for id in ["rin", "backend", "frontend", "devops"] {
                 let dir = root.join("project/agents").join(id);
                 fs::create_dir_all(&dir).unwrap();
                 fs::write(dir.join("INSTRUCTIONS.md"), format!("# {id}\n")).unwrap();
@@ -455,9 +455,11 @@ mod tests {
             "instructions/rin/INSTRUCTIONS.md",
             "instructions/backend/INSTRUCTIONS.md",
             "instructions/frontend/INSTRUCTIONS.md",
+            "instructions/devops/INSTRUCTIONS.md",
             "env/rin.env",
             "env/backend.env",
             "env/frontend.env",
+            "env/devops.env",
             "bifrost/config.json",
             "bifrost/bifrost.env",
         ] {
@@ -481,7 +483,7 @@ mod tests {
 
         // Secrets are yours only.
         use std::os::unix::fs::PermissionsExt;
-        for path in ["tokens.json", "env/backend.env", "bifrost/bifrost.env"] {
+        for path in ["tokens.json", "env/devops.env", "bifrost/bifrost.env"] {
             let mode = fs::metadata(f.team().join(path))
                 .unwrap()
                 .permissions()
@@ -536,7 +538,7 @@ mod tests {
         let new: Tokens = serde_json::from_str(&f.read("tokens.json")).unwrap();
         assert_eq!(
             old.keys().collect::<Vec<_>>(),
-            ["backend", "frontend", "rin", "user"]
+            ["backend", "devops", "frontend", "rin", "user"]
         );
         assert_eq!(
             old.keys().collect::<Vec<_>>(),
@@ -614,7 +616,7 @@ mod tests {
             !compose.contains("sk-ant-secret")
                 && !f.read("bifrost/config.json").contains("sk-ant-secret")
         );
-        for id in ["rin", "backend", "frontend"] {
+        for id in ["rin", "backend", "frontend", "devops"] {
             let env = f.read(&format!("env/{id}.env"));
             let rin_tokens: Vec<&str> = env
                 .lines()
@@ -629,15 +631,16 @@ mod tests {
         }
         // Only the API-key agent gets a virtual key; it is in Bifrost's env, as a reference in config.json.
         assert!(
-            f.read("env/backend.env")
+            f.read("env/devops.env")
                 .contains("ANTHROPIC_API_KEY=sk-bf-")
         );
+        assert!(!f.read("env/backend.env").contains("sk-bf-"));
         assert!(!f.read("env/frontend.env").contains("sk-bf-"));
         let config: serde_json::Value =
             serde_json::from_str(&f.read("bifrost/config.json")).unwrap();
         assert_eq!(
             config["governance"]["virtual_keys"][0]["value"],
-            "env.BIFROST_VK_BACKEND"
+            "env.BIFROST_VK_DEVOPS"
         );
         assert_eq!(
             config["providers"]
@@ -659,12 +662,13 @@ mod tests {
             "      - \"127.0.0.1:10302:7000\"\n",
             "      - rin-my-team-backend-home:/home/agent\n",
             "      - ./instructions/rin/INSTRUCTIONS.md:/home/agent/.claude/CLAUDE.md:ro\n",
-            "      - ./instructions/frontend/INSTRUCTIONS.md:/home/agent/.codex/AGENTS.md:ro\n",
-            "      - ./instructions/backend/INSTRUCTIONS.md:/home/agent/.pi/agent/AGENTS.md:ro\n",
+            "      - ./instructions/backend/INSTRUCTIONS.md:/home/agent/.codex/AGENTS.md:ro\n",
+            "      - ./instructions/frontend/INSTRUCTIONS.md:/home/agent/.gemini/GEMINI.md:ro\n",
+            "      - ./instructions/devops/INSTRUCTIONS.md:/home/agent/.pi/agent/AGENTS.md:ro\n",
             "      - ./tokens.json:/etc/rin/tokens.json:ro\n",
             "    hostname: backend\n",
-            "    cpus: 2\n",
-            "    mem_limit: \"4g\"\n",
+            "    cpus: 1\n",
+            "    mem_limit: \"2g\"\n",
             "        RIN_GIT_REV: v0.1.0\n",
             "  rin-my-team-hub:\n    name: rin-my-team-hub\n",
             "  bifrost:\n",
@@ -709,7 +713,7 @@ mod tests {
         f.generate().unwrap();
         let compose = f.read("docker-compose.yml");
         assert!(!compose.contains("bifrost"), "{compose}");
-        assert!(!f.read("env/backend.env").contains("sk-bf-"));
+        assert!(!f.read("env/devops.env").contains("sk-bf-"));
     }
 
     #[test]
@@ -754,13 +758,13 @@ mod tests {
         let f = Fixture::new("remove");
         f.generate().unwrap();
         let text = fs::read_to_string(f.root.join("project/rin.yml")).unwrap();
-        let cut = text.find("  - id: frontend").unwrap();
+        let cut = text.find("  - id: devops").unwrap();
         fs::write(f.root.join("project/rin.yml"), &text[..cut]).unwrap();
-        fs::remove_dir_all(f.root.join("project/agents/frontend")).unwrap();
+        fs::remove_dir_all(f.root.join("project/agents/devops")).unwrap();
         f.generate().unwrap();
-        assert!(!f.team().join("env/frontend.env").exists());
-        assert!(!f.team().join("instructions/frontend").exists());
+        assert!(!f.team().join("env/devops.env").exists());
+        assert!(!f.team().join("instructions/devops").exists());
         let tokens: Tokens = serde_json::from_str(&f.read("tokens.json")).unwrap();
-        assert!(!tokens.contains_key("frontend"));
+        assert!(!tokens.contains_key("devops"));
     }
 }
