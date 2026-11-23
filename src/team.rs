@@ -1,12 +1,12 @@
-//! `$RIN_HOME` and the generated team folders in it.
+//! `$RIN_HOME` and the generated team directories in it.
 
+use crate::rin_bail;
+use anyhow::{Context, Result, anyhow};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, anyhow, bail};
-
-use crate::config::Config;
+use crate::shared::config::{self, Config};
 
 /// Where the hub is published on your machine.
 pub const HOST_HUB_URL: &str = "http://127.0.0.1:10302";
@@ -58,14 +58,14 @@ impl Team {
                 name.trim().to_string()
             }
         };
-        // One folder in teams/, never a path: `my-team/` would become the current
+        // One directory in teams/, never a path: `my-team/` would become the current
         // team as written, and then be no Compose project name.
         if Path::new(&name).file_name() != Some(std::ffi::OsStr::new(&name)) {
-            bail!("unknown team {name:?}: a team is named as in its rin.yml");
+            rin_bail!("unknown team {name:?}: a team is named as in its rin.yml");
         }
         let team = Team::at(&home, &name);
         if !team.rin_json().is_file() {
-            bail!(
+            rin_bail!(
                 "unknown team {name:?}: no {} (run `rin generate`)",
                 team.rin_json().display()
             );
@@ -90,7 +90,7 @@ impl Team {
     }
 
     pub fn config(&self) -> Result<Config> {
-        crate::config::from_json_file(&self.rin_json())
+        config::from_json_file(&self.rin_json())
     }
 
     pub fn tokens(&self) -> Result<Tokens> {

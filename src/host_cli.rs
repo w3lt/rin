@@ -3,12 +3,16 @@
 mod generate;
 
 use crate::client::Client;
+use crate::files;
+use crate::rin_bail;
+use crate::rinerrln;
+use crate::rinlogln;
 use crate::team::{self, Team};
-use crate::{config, display};
-use anyhow::{Context, Result, bail};
+use crate::{display, shared::config};
+use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::os::unix::process::CommandExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
@@ -29,7 +33,7 @@ fn run(mut command: Command) -> Result<()> {
         .status()
         .context("cannot run docker (is Docker installed and running?)")?;
     if !status.success() {
-        bail!("docker compose failed ({status})");
+        rin_bail!("docker compose failed ({status})");
     }
     Ok(())
 }
@@ -50,7 +54,7 @@ fn states(team: &Team) -> Result<HashMap<String, String>> {
         .output()
         .context("cannot run docker (is Docker installed and running?)")?;
     if !output.status.success() {
-        bail!(
+        rin_bail!(
             "docker compose ps failed: {}",
             String::from_utf8_lossy(&output.stderr).trim()
         );
@@ -106,7 +110,7 @@ pub fn up(team: &Team) -> Result<()> {
     let hub_up = states.get("hub").is_some_and(|s| s == "running");
     let any_up = states.values().any(|s| s == "running");
     if !hub_up && std::net::TcpListener::bind(("127.0.0.1", team::HUB_PORT)).is_err() {
-        bail!(
+        rin_bail!(
             "cannot start team {}: port {} on 127.0.0.1 is already in use{}. Only one Rin team can be up at a time: run `rin down --team <name>` first",
             team.name,
             team::HUB_PORT,
@@ -130,7 +134,7 @@ pub fn up(team: &Team) -> Result<()> {
         } else {
             "is not up"
         };
-        bail!(
+        rin_bail!(
             "{e}\nteam {} {state}; if the error is about port {}, another Rin team or program is using it{}",
             team.name,
             team::HUB_PORT,
@@ -140,8 +144,8 @@ pub fn up(team: &Team) -> Result<()> {
     // Last, so the build output doesn't scroll it away.
     let keys_env = team::rin_home()?.join("keys.env");
     if !keys_env.is_file() && team.config().is_ok_and(|c| c.uses_api_keys()) {
-        eprintln!(
-            "rin: warning: {} is missing: API-key agents will fail. Add your provider keys, then run `rin generate` and `rin up`",
+        rinerrln!(
+            "warning: {} is missing: API-key agents will fail. Add your provider keys, then run `rin generate` and `rin up`",
             keys_env.display()
         );
     }
@@ -165,7 +169,7 @@ pub fn down(team: &Team) -> Result<()> {
 /// Replaces this process with a shell in the agent's container.
 pub fn shell(team: &Team, id: &str) -> Result<()> {
     if team.config()?.agent(id).is_none() {
-        bail!("unknown agent: {id:?}");
+        rin_bail!("unknown agent: {id:?}");
     }
     let mut command = compose(team);
     command.args(["exec", "-u", "agent", id, "bash"]);
@@ -205,7 +209,7 @@ pub async fn status(team: &Team) -> Result<()> {
         rows.push(vec![
             agent.id.clone(),
             agent.label.clone(),
-            agent.kind.as_str().into(),
+            agent.agent_type.as_str().into(),
             agent.harness.as_str().into(),
             state,
             sessions,
@@ -232,7 +236,7 @@ pub async fn log(team: &Team, follow: bool, agent: Option<&str>) -> Result<()> {
     if let Some(id) = agent
         && team.config()?.agent(id).is_none()
     {
-        bail!("unknown agent: {id:?}");
+        rin_bail!("unknown agent: {id:?}");
     }
     let mut client = client(team)?;
     let mut after = 0;
@@ -241,7 +245,7 @@ pub async fn log(team: &Team, follow: bool, agent: Option<&str>) -> Result<()> {
         match client.log(agent, after).await {
             Ok(page) => {
                 if std::mem::take(&mut lost) {
-                    eprintln!("rin: following again");
+                    rinerrln!("following again");
                 }
                 let more = page.len() >= crate::proto::LOG_PAGE;
                 for event in page {
@@ -257,7 +261,7 @@ pub async fn log(team: &Team, follow: bool, agent: Option<&str>) -> Result<()> {
             }
             Err(e) if follow => {
                 if !std::mem::replace(&mut lost, true) {
-                    eprintln!("rin: {e:#} (still following)");
+                    rinerrln!("{e:#} (still following)");
                 }
                 // The hub may come back with new tokens (`rin generate && rin up`).
                 if let Ok(fresh) = self::client(team) {
@@ -286,7 +290,7 @@ pub fn generate_config(config_file: PathBuf, instructions: PathBuf) -> Result<()
         .unwrap_or_else(|| format!("v{}", config::VERSION));
     let generated = generate::generate(&config_file, &instructions, &team::rin_home()?, &git_rev)?;
     for warning in &generated.warnings {
-        eprintln!("warning: {warning}");
+        rinerrln!("warning: {warning}");
     }
     println!(
         "team {} written to {} (now the current team)",
@@ -294,4 +298,198 @@ pub fn generate_config(config_file: PathBuf, instructions: PathBuf) -> Result<()
         generated.team.dir.display()
     );
     Ok(())
+}
+
+/// Writes a starter project to `<dir>/<name>`: `rin.yml` and one
+/// `agents/<id>/INSTRUCTIONS.md` per agent. Writes nothing if any of them exists.
+pub fn init_project(name: Option<String>, dir: PathBuf) -> Result<()> {
+    let name = name.unwrap_or_else(config::Config::dummy_team_name);
+    config::check_team_name(&name)?;
+    let (config, instructions) = config::Config::init(name);
+
+    let path = dir.join(&config.name);
+    ensure_project_dir(&path)?;
+    let rin_yml = path.join("rin.yml");
+    let yaml = format!(
+        "{}\n{}",
+        config::rin_yaml_schema_directive(),
+        serde_saphyr::to_string(&config)?
+    );
+    let writes: Vec<(PathBuf, String)> = config
+        .agents
+        .iter()
+        .zip(instructions)
+        .map(|(agent, text)| {
+            let file = path.join("agents").join(&agent.id).join("INSTRUCTIONS.md");
+            (file, text)
+        })
+        // Last, so a project with a rin.yml is a complete one.
+        .chain([(rin_yml, yaml)])
+        .collect();
+    ensure_nothing_to_overwrite(&path, &writes)?;
+
+    for (file, text) in &writes {
+        files::write_if_changed(file, text.as_bytes())?;
+    }
+    rinlogln!("Done! Happy hacking with Rin!");
+    Ok(())
+}
+
+/// `path` is a directory, or nothing yet.
+fn ensure_project_dir(path: &Path) -> Result<()> {
+    if path.exists() && !path.is_dir() {
+        rin_bail!("{} is not a directory", path.display());
+    }
+    Ok(())
+}
+
+/// None of the files `init` would write exist yet.
+fn ensure_nothing_to_overwrite(path: &Path, writes: &[(PathBuf, String)]) -> Result<()> {
+    // `symlink_metadata`, not `exists`: never write through a dangling link.
+    let existing: Vec<&PathBuf> = writes
+        .iter()
+        .map(|(file, _)| file)
+        .filter(|file| file.symlink_metadata().is_ok())
+        .collect();
+    if existing.iter().any(|file| file.ends_with("rin.yml")) {
+        rin_bail!("{} is already a Rin project", path.display());
+    }
+    if let Some(file) = existing.first() {
+        rin_bail!("{} already exists; move it away first", file.display());
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    struct Scratch(PathBuf);
+
+    impl Scratch {
+        fn new(name: &str) -> Scratch {
+            let dir = std::env::temp_dir().join(format!("rin-init-{name}-{}", std::process::id()));
+            let _ = fs::remove_dir_all(&dir);
+            fs::create_dir_all(&dir).unwrap();
+            Scratch(dir)
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn init_writes_rin_yml_and_instructions() {
+        let s = Scratch::new("files");
+        init_project(Some("my-team".into()), s.0.clone()).unwrap();
+        let project = s.0.join("my-team");
+        let (expected, instructions) = config::Config::init("my-team".into());
+
+        let yaml = fs::read_to_string(project.join("rin.yml")).unwrap();
+        assert!(yaml.starts_with(&format!("{}\n", config::rin_yaml_schema_directive())));
+        assert_eq!(config::from_yaml(&yaml).unwrap(), expected);
+
+        let mut dirs: Vec<_> = fs::read_dir(project.join("agents"))
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        dirs.sort();
+        let mut ids: Vec<_> = expected.agents.iter().map(|a| a.id.clone()).collect();
+        ids.sort();
+        assert_eq!(dirs, ids);
+        for (agent, text) in expected.agents.iter().zip(&instructions) {
+            let file = project
+                .join("agents")
+                .join(&agent.id)
+                .join("INSTRUCTIONS.md");
+            assert_eq!(
+                &fs::read_to_string(&file).unwrap(),
+                text,
+                "{}",
+                file.display()
+            );
+        }
+    }
+
+    #[test]
+    fn init_without_a_name_makes_rinteam() {
+        let s = Scratch::new("default-name");
+        init_project(None, s.0.clone()).unwrap();
+        let yaml = fs::read_to_string(s.0.join("rinteam/rin.yml")).unwrap();
+        assert_eq!(config::from_yaml(&yaml).unwrap().name, "rinteam");
+    }
+
+    #[test]
+    fn init_refuses_a_file_in_the_way() {
+        let s = Scratch::new("file");
+        fs::write(s.0.join("my-team"), "mine").unwrap();
+        let e = init_project(Some("my-team".into()), s.0.clone()).unwrap_err();
+        assert!(format!("{e:#}").contains("is not a directory"), "{e:#}");
+        assert_eq!(fs::read_to_string(s.0.join("my-team")).unwrap(), "mine");
+    }
+
+    #[test]
+    fn init_refuses_an_existing_project() {
+        let s = Scratch::new("again");
+        init_project(Some("my-team".into()), s.0.clone()).unwrap();
+        fs::write(s.0.join("my-team/rin.yml"), "mine").unwrap();
+        let e = init_project(Some("my-team".into()), s.0.clone()).unwrap_err();
+        assert!(
+            format!("{e:#}").contains("is already a Rin project"),
+            "{e:#}"
+        );
+        assert_eq!(
+            fs::read_to_string(s.0.join("my-team/rin.yml")).unwrap(),
+            "mine"
+        );
+    }
+
+    #[test]
+    fn init_keeps_existing_instructions() {
+        let s = Scratch::new("keep");
+        let mine = s.0.join("my-team/agents/backend/INSTRUCTIONS.md");
+        fs::create_dir_all(mine.parent().unwrap()).unwrap();
+        fs::write(&mine, "mine").unwrap();
+        let e = init_project(Some("my-team".into()), s.0.clone()).unwrap_err();
+        assert!(format!("{e:#}").contains("already exists"), "{e:#}");
+        assert_eq!(fs::read_to_string(&mine).unwrap(), "mine");
+        assert!(!s.0.join("my-team/rin.yml").exists(), "nothing written");
+        assert!(
+            !s.0.join("my-team/agents/rinlead").exists(),
+            "nothing written"
+        );
+    }
+
+    #[test]
+    fn init_refuses_names_the_schema_rejects() {
+        let s = Scratch::new("names");
+        let outside = s.0.join("outside");
+        for name in ["Bad Name", "../outside", outside.to_str().unwrap(), ""] {
+            let e = init_project(Some(name.into()), s.0.join("dir")).unwrap_err();
+            assert!(
+                format!("{e:#}").contains("invalid team name"),
+                "{name}: {e:#}"
+            );
+        }
+        assert!(!s.0.join("dir").exists() && !outside.exists());
+    }
+
+    #[test]
+    fn rin_generate_accepts_what_init_writes() {
+        let s = Scratch::new("generate");
+        init_project(Some("my-team".into()), s.0.clone()).unwrap();
+        let project = s.0.join("my-team");
+        let generated = generate::generate(
+            &project.join("rin.yml"),
+            &project.join("agents"),
+            &s.0.join("home"),
+            config::VERSION,
+        )
+        .unwrap();
+        assert_eq!(generated.team.name, "my-team");
+    }
 }

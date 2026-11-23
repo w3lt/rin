@@ -46,7 +46,6 @@ cfg_select! {
 }
 
 mod client;
-mod config;
 mod display;
 mod proto;
 mod shared;
@@ -98,9 +97,18 @@ enum HostCmd {
     Completions {
         shell: Shell,
     },
-    /// Validate rin.yml and write the team's folder in $RIN_HOME; makes it the current team.
+    /// Create a new Rin project in DIR/NAME (rin.yml and agents/<id>/INSTRUCTIONS.md).
+    Init {
+        /// Directory to create the project directory in.
+        #[arg(short = 'd', long = "dir", default_value = ".", value_name = "DIR")]
+        directory: PathBuf,
+
+        /// Team name, also the project directory's name [default: rinteam]
+        name: Option<String>,
+    },
+    /// Validate rin.yml and write the team's directory in $RIN_HOME; makes it the current team.
     Generate {
-        /// Folder with one <agent id>/INSTRUCTIONS.md per agent.
+        /// Directory with one <agent id>/INSTRUCTIONS.md per agent.
         #[arg(long, value_name = "DIR")]
         instructions: PathBuf,
         /// The team config.
@@ -165,6 +173,7 @@ async fn run(cli: Cli) -> Result<()> {
                 let mut cmd = Cli::command();
                 generate(shell, &mut cmd, "rin", &mut std::io::stdout())
             }
+            HostCmd::Init { directory, name } => host_cli::init_project(name, directory)?,
             HostCmd::Generate { instructions, file } => {
                 host_cli::generate_config(file, instructions)?
             }
@@ -202,7 +211,7 @@ async fn run(cli: Cli) -> Result<()> {
 async fn main() {
     let cli = Cli::parse();
     if let Err(e) = run(cli).await {
-        eprintln!("rin: {e:#}");
+        rinerrln!("{e:#}");
         std::process::exit(1);
     }
 }

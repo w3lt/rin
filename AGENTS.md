@@ -6,6 +6,9 @@
   the release workflow's build checks (not its publish dry run). `scripts/verify_code.sh fast` is fmt + clippy;
   `scripts/verify_code.sh matrix` adds clippy on every feature subset.
 - `scripts/verify_docker.sh`: needs Docker; starts a throwaway team and checks every service stays up (see below).
+- `scripts/inspect_environment.sh`: checks this machine's development environment: git, hooks, the Rust
+  toolchain (rustc ≥ 1.89, fmt, clippy), Docker and Compose (≥ 5.6). Run it when a check fails for reasons
+  unrelated to the change, and before `scripts/verify_docker.sh` to see whether Docker is usable here.
 - One test: `cargo test --all-features <name>`. Plain `cargo test` skips the
   end-to-end tests in `src/tests.rs`, which need all three features.
 - Git hooks live in `.githooks/`; enable them once per clone with `git config core.hooksPath .githooks`.

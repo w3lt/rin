@@ -4,14 +4,14 @@
 //! Codex's `config.toml` is written out again as a whole when one of them
 //! changes: your other keys keep their values, but not comments or layout.
 
+use crate::rin_bail;
+use crate::rinerrln;
+use crate::shared::config::Harness;
+use anyhow::{Context, Result};
+use serde_json::{Map, Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-
-use anyhow::{Context, Result, bail};
-use serde_json::{Map, Value, json};
-
-use crate::config::Harness;
 
 pub struct Settings<'a> {
     pub harness: Harness,
@@ -87,8 +87,8 @@ pub fn apply(home: &Path, settings: &Settings) -> Result<Vec<PathBuf>> {
                             .insert("baseUrl".into(), json!(url));
                     })?,
                     // Without a route pi would send its Bifrost key straight to the provider.
-                    None => eprintln!(
-                        "rin runtime: pi model {:?} can't be routed through Bifrost: write it as anthropic/<model>, openai/<model> or google/<model>",
+                    None => rinerrln!(
+                        "runtime: pi model {:?} can't be routed through Bifrost: write it as anthropic/<model>, openai/<model> or google/<model>",
                         settings.model
                     ),
                 }
@@ -135,7 +135,7 @@ fn merge_json(path: &Path, edit: &dyn Fn(&mut Map<String, Value>)) -> Result<boo
             .with_context(|| format!("{} is not valid JSON; fix or delete it", path.display()))?
     };
     let Value::Object(mut map) = original.clone() else {
-        bail!("{} is not a JSON object; fix or delete it", path.display());
+        rin_bail!("{} is not a JSON object; fix or delete it", path.display());
     };
     edit(&mut map);
     let updated = Value::Object(map);

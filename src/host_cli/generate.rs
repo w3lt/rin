@@ -1,15 +1,16 @@
-//! `rin generate`: validate `rin.yml` + `agents/` and write the team's folder in `$RIN_HOME`.
+//! `rin generate`: validate `rin.yml` + `agents/` and write the team's directory in `$RIN_HOME`.
 
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use serde_json::json;
 
 use crate::compose;
-use crate::config::{self, Authentication, Config, VERSION};
 use crate::files::{random_hex, write_if_changed, write_private, write_shared};
+use crate::rin_bail;
+use crate::shared::config::{self, Authentication, Config, VERSION};
 use crate::team::{self, Team, Tokens, read_tokens};
 
 pub const DOCKERFILE: &str = include_str!("../../images/Dockerfile");
@@ -33,7 +34,7 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
         fs::read_to_string(file).with_context(|| format!("cannot read {}", file.display()))?;
     let config = config::from_yaml(&text).with_context(|| file.display().to_string())?;
     if config.version != VERSION {
-        bail!(
+        rin_bail!(
             "{}: version {} does not match this rin ({VERSION}); install rin {} or change `version:`",
             file.display(),
             config.version,
@@ -48,7 +49,7 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
     let new_home = !home.exists();
     fs::create_dir_all(&team.dir)
         .with_context(|| format!("cannot create {}", team.dir.display()))?;
-    // Only lock down what Rin made: $RIN_HOME may be a folder you use for more.
+    // Only lock down what Rin made: $RIN_HOME may be a directory you use for more.
     if new_home {
         crate::files::set_mode(home, 0o700)?;
     }
@@ -108,10 +109,10 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
     Ok(Generated { team, warnings })
 }
 
-/// Every agent has `<dir>/<id>/INSTRUCTIONS.md`, and every folder is an agent.
+/// Every agent has `<dir>/<id>/INSTRUCTIONS.md`, and every directory is an agent.
 fn check_instructions(config: &Config, dir: &Path) -> Result<Vec<(String, PathBuf)>> {
     if !dir.is_dir() {
-        bail!("instructions folder {} not found", dir.display());
+        rin_bail!("instructions directory {} not found", dir.display());
     }
     let mut problems = Vec::new();
     let mut entries: Vec<_> = fs::read_dir(dir)
@@ -130,22 +131,25 @@ fn check_instructions(config: &Config, dir: &Path) -> Result<Vec<(String, PathBu
     }
     let mut sources = Vec::new();
     for agent in &config.agents {
-        let folder = dir.join(&agent.id);
-        let file = folder.join("INSTRUCTIONS.md");
-        if !folder.is_dir() {
+        let agent_dir = dir.join(&agent.id);
+        let file = agent_dir.join("INSTRUCTIONS.md");
+        if !agent_dir.is_dir() {
             problems.push(format!(
-                "agent {:?} has no folder {}",
+                "agent {:?} has no directory {}",
                 agent.id,
-                folder.display()
+                agent_dir.display()
             ));
         } else if !file.is_file() {
-            problems.push(format!("{}: INSTRUCTIONS.md is missing", folder.display()));
+            problems.push(format!(
+                "{}: INSTRUCTIONS.md is missing",
+                agent_dir.display()
+            ));
         } else {
             sources.push((agent.id.clone(), file));
         }
     }
     if !problems.is_empty() {
-        bail!(
+        rin_bail!(
             "instructions don't match rin.yml:\n  {}",
             problems.join("\n  ")
         );
@@ -195,13 +199,13 @@ fn check_names(home: &Path, config: &Config) -> Result<()> {
         if name == config.name {
             continue;
         }
-        // A team folder Rin can't read (another version, half deleted) has no say.
+        // A team directory Rin can't read (another version, half deleted) has no say.
         let Ok(other) = Team::at(home, &name).config() else {
             continue;
         };
         let theirs = compose::docker_names(&other);
         if let Some((kind, clash)) = ours.iter().find(|n| theirs.contains(n)) {
-            bail!(
+            rin_bail!(
                 "team {:?} would use the Docker {kind} name {clash:?}, which team {name:?} already uses: rename the team or an agent",
                 config.name
             );
@@ -363,7 +367,7 @@ mod tests {
         )
     }
 
-    /// A project folder (copy of examples/team, edited) and an empty `$RIN_HOME`.
+    /// A project directory (copy of examples/team, edited) and an empty `$RIN_HOME`.
     struct Fixture {
         root: PathBuf,
     }
@@ -373,7 +377,7 @@ mod tests {
             let root =
                 std::env::temp_dir().join(format!("rin-generate-{name}-{}", std::process::id()));
             let _ = fs::remove_dir_all(&root);
-            for id in ["rin", "backend", "frontend"] {
+            for id in ["rin", "backend", "frontend", "devops"] {
                 let dir = root.join("project/agents").join(id);
                 fs::create_dir_all(&dir).unwrap();
                 fs::write(dir.join("INSTRUCTIONS.md"), format!("# {id}\n")).unwrap();
@@ -416,7 +420,7 @@ mod tests {
             fs::read_to_string(self.team().join(path)).unwrap()
         }
 
-        /// Every file in the team folder → its bytes.
+        /// Every file in the team directory → its bytes.
         fn snapshot(&self) -> BTreeMap<PathBuf, Vec<u8>> {
             fn walk(dir: &Path, out: &mut BTreeMap<PathBuf, Vec<u8>>) {
                 for entry in fs::read_dir(dir).unwrap().flatten() {
@@ -441,7 +445,7 @@ mod tests {
     }
 
     #[test]
-    fn writes_the_team_folder() {
+    fn writes_the_team_directory() {
         let f = Fixture::new("c1");
         let generated = f.generate().unwrap();
         assert!(generated.warnings.is_empty(), "{:?}", generated.warnings);
@@ -454,9 +458,11 @@ mod tests {
             "instructions/rin/INSTRUCTIONS.md",
             "instructions/backend/INSTRUCTIONS.md",
             "instructions/frontend/INSTRUCTIONS.md",
+            "instructions/devops/INSTRUCTIONS.md",
             "env/rin.env",
             "env/backend.env",
             "env/frontend.env",
+            "env/devops.env",
             "bifrost/config.json",
             "bifrost/bifrost.env",
         ] {
@@ -480,7 +486,7 @@ mod tests {
 
         // Secrets are yours only.
         use std::os::unix::fs::PermissionsExt;
-        for path in ["tokens.json", "env/backend.env", "bifrost/bifrost.env"] {
+        for path in ["tokens.json", "env/devops.env", "bifrost/bifrost.env"] {
             let mode = fs::metadata(f.team().join(path))
                 .unwrap()
                 .permissions()
@@ -535,7 +541,7 @@ mod tests {
         let new: Tokens = serde_json::from_str(&f.read("tokens.json")).unwrap();
         assert_eq!(
             old.keys().collect::<Vec<_>>(),
-            ["backend", "frontend", "rin", "user"]
+            ["backend", "devops", "frontend", "rin", "user"]
         );
         assert_eq!(
             old.keys().collect::<Vec<_>>(),
@@ -613,7 +619,7 @@ mod tests {
             !compose.contains("sk-ant-secret")
                 && !f.read("bifrost/config.json").contains("sk-ant-secret")
         );
-        for id in ["rin", "backend", "frontend"] {
+        for id in ["rin", "backend", "frontend", "devops"] {
             let env = f.read(&format!("env/{id}.env"));
             let rin_tokens: Vec<&str> = env
                 .lines()
@@ -628,15 +634,16 @@ mod tests {
         }
         // Only the API-key agent gets a virtual key; it is in Bifrost's env, as a reference in config.json.
         assert!(
-            f.read("env/backend.env")
+            f.read("env/devops.env")
                 .contains("ANTHROPIC_API_KEY=sk-bf-")
         );
+        assert!(!f.read("env/backend.env").contains("sk-bf-"));
         assert!(!f.read("env/frontend.env").contains("sk-bf-"));
         let config: serde_json::Value =
             serde_json::from_str(&f.read("bifrost/config.json")).unwrap();
         assert_eq!(
             config["governance"]["virtual_keys"][0]["value"],
-            "env.BIFROST_VK_BACKEND"
+            "env.BIFROST_VK_DEVOPS"
         );
         assert_eq!(
             config["providers"]
@@ -658,12 +665,13 @@ mod tests {
             "      - \"127.0.0.1:10302:7000\"\n",
             "      - rin-my-team-backend-home:/home/agent\n",
             "      - ./instructions/rin/INSTRUCTIONS.md:/home/agent/.claude/CLAUDE.md:ro\n",
-            "      - ./instructions/frontend/INSTRUCTIONS.md:/home/agent/.codex/AGENTS.md:ro\n",
-            "      - ./instructions/backend/INSTRUCTIONS.md:/home/agent/.pi/agent/AGENTS.md:ro\n",
+            "      - ./instructions/backend/INSTRUCTIONS.md:/home/agent/.codex/AGENTS.md:ro\n",
+            "      - ./instructions/frontend/INSTRUCTIONS.md:/home/agent/.gemini/GEMINI.md:ro\n",
+            "      - ./instructions/devops/INSTRUCTIONS.md:/home/agent/.pi/agent/AGENTS.md:ro\n",
             "      - ./tokens.json:/etc/rin/tokens.json:ro\n",
             "    hostname: backend\n",
-            "    cpus: 2\n",
-            "    mem_limit: \"4g\"\n",
+            "    cpus: 1\n",
+            "    mem_limit: \"2g\"\n",
             "        RIN_GIT_REV: v0.1.0\n",
             "  rin-my-team-hub:\n    name: rin-my-team-hub\n",
             "  bifrost:\n",
@@ -708,7 +716,7 @@ mod tests {
         f.generate().unwrap();
         let compose = f.read("docker-compose.yml");
         assert!(!compose.contains("bifrost"), "{compose}");
-        assert!(!f.read("env/backend.env").contains("sk-bf-"));
+        assert!(!f.read("env/devops.env").contains("sk-bf-"));
     }
 
     #[test]
@@ -728,7 +736,7 @@ mod tests {
 
         fs::remove_dir_all(f.root.join("project/agents/frontend")).unwrap();
         let e = format!("{:#}", f.generate().unwrap_err());
-        assert!(e.contains("agent \"frontend\" has no folder"), "{e}");
+        assert!(e.contains("agent \"frontend\" has no directory"), "{e}");
         assert!(!f.team().exists(), "nothing written for a rejected config");
     }
 
@@ -753,13 +761,18 @@ mod tests {
         let f = Fixture::new("remove");
         f.generate().unwrap();
         let text = fs::read_to_string(f.root.join("project/rin.yml")).unwrap();
+        // Cuts frontend (subscription) and devops (API key), the last two agents.
         let cut = text.find("  - id: frontend").unwrap();
         fs::write(f.root.join("project/rin.yml"), &text[..cut]).unwrap();
-        fs::remove_dir_all(f.root.join("project/agents/frontend")).unwrap();
+        for id in ["frontend", "devops"] {
+            fs::remove_dir_all(f.root.join("project/agents").join(id)).unwrap();
+        }
         f.generate().unwrap();
-        assert!(!f.team().join("env/frontend.env").exists());
-        assert!(!f.team().join("instructions/frontend").exists());
         let tokens: Tokens = serde_json::from_str(&f.read("tokens.json")).unwrap();
-        assert!(!tokens.contains_key("frontend"));
+        for id in ["frontend", "devops"] {
+            assert!(!f.team().join(format!("env/{id}.env")).exists(), "{id}");
+            assert!(!f.team().join("instructions").join(id).exists(), "{id}");
+            assert!(!tokens.contains_key(id), "{id}");
+        }
     }
 }
