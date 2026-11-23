@@ -42,7 +42,7 @@ One AI agent is handy. A whole **team** of them, with an architect who plans, en
 
 <sup>EPISODE 2 ・ 第二話</sup>
 
-The example in [`examples/team`](examples/team) stars three agents:
+The example in [`examples/team`](examples/team) stars four agents:
 
 <img src="assets/team.svg" alt="You talk to rin, the leader. rin delegates to backend and frontend, then reviews their work. The agents message each other, and you can talk to any of them directly. Every agent lives in its own Docker container." width="100%">
 

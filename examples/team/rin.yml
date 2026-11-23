@@ -44,7 +44,7 @@ agents:
     label: Devops Engineer
     harness: pi
     authentication: apiKey
-    model: ollama/inkling-2-small
+    model: anthropic/claude-sonnet-5-5
     resources:
       cpus: 1
       ram: 2g

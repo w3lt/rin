@@ -30,9 +30,6 @@
     ],
     "defaultMode": "auto"
   },
-  "env": {
-    "RIN_AUTO_GITHOOKS": "0"
-  },
   "hooks": {
     "SessionStart": [
       {

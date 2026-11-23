@@ -39,4 +39,4 @@ GIT_INDEX_FILE="$snapshot.index" \
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$root/target}"
 
 cd "$snapshot"
-exec ./scripts/verify_code.sh matrix
+./scripts/verify_code.sh matrix

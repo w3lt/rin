@@ -38,3 +38,6 @@ FAIL (<mode>) at <step>
 ```
 
 At most 10 lines. Quote at most 5 lines of compiler or test output, only when it pins down the cause.
+
+If a script, hook or instruction itself misbehaved (not the code under test), add a
+`Harness: <what happened>. Fix: <suggestion>.` line, also after `PASS`.

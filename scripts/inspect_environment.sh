@@ -10,7 +10,7 @@ set -u
 cd "$(dirname "$0")/.." || exit 1
 
 # Minimum requirements
-rust_min=1.85
+rust_min=1.89
 compose_min=5.6
 
 failed=0
@@ -113,7 +113,7 @@ if have docker; then
         warn compose "plugin not found; need Compose $compose_min or later"
     fi
 else
-    warn docker "not found; needed for scripts/verify.sh docker and rin up"
+    warn docker "not found; needed for scripts/verify_docker.sh docker and rin up"
 fi
 
 if [ "$failed" -ne 0 ]; then

@@ -50,4 +50,5 @@ Follow AGENTS.md. In short:
 ## Report
 
 End with: rounds run, findings fixed, findings rejected (with the one-line reason), anything
-left for the user (manifest changes, Docker/Linux paths nobody ran here).
+left for the user (manifest changes, Docker/Linux paths nobody ran here), and harness issues per
+AGENTS.md "Harness feedback" (including any `Harness:` lines from the subagents), or "Harness: none".

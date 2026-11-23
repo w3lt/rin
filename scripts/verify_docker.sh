@@ -28,8 +28,11 @@ compose() {
 cleanup() {
     local status=$?
     if [[ -f "$RIN_HOME/teams/$team/docker-compose.yml" ]]; then
-        [[ "$status" -ne 0 ]] && compose logs --no-color --tail 30 2>&1
-        compose down -v --remove-orphans >/dev/null 2>&1
+        if [[ "$status" -ne 0 ]]; then
+            compose logs --no-color --tail 30 2>&1 || true
+        fi
+        compose down -v --remove-orphans >/dev/null 2>&1 \
+            || echo "WARN cleanup: compose down failed; run: docker compose -p rin-$team down -v" >&2
     fi
     rm -rf "$tmp"
     exit "$status"

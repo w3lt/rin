@@ -10,12 +10,13 @@ step() {
         printf ' %q' "$@"
         echo
         local half=$((lines / 2))
-        head -n "$half" "$log"
-        tail -n "$half" "$log"
-        local total
         total="$(wc -l <"$log" | tr -d ' ')"
-        if [ "$total" -gt "$lines" ]; then
-            echo "... ($((total - lines)) more lines; rerun the command above for all of it)"
+        if [ "$total" -le "$lines" ]; then
+            cat "$log"
+        else
+            head -n "$half" "$log"
+            echo "... ($((total - 2 * half)) lines omitted; rerun the command above for all of it)"
+            tail -n "$half" "$log"
         fi
         exit 1
     fi
