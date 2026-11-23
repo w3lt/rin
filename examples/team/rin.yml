@@ -15,20 +15,36 @@ agents:
     authentication: subscription
     model: claude-opus-5-5
     maxSessions: 3
-    resources: { cpus: 2, ram: 4g }
+    resources:
+      cpus: 1
+      ram: 2g
 
   - id: backend
     type: member
     label: Backend Engineer
-    harness: pi
-    authentication: apiKey
-    model: anthropic/claude-sonnet-5-5
-    resources: { cpus: 2, ram: 4g }
+    harness: codex
+    authentication: subscription
+    model: gpt-6-luna
+    resources:
+      cpus: 1
+      ram: 2g
 
   - id: frontend
     type: member
     label: Frontend Engineer
-    harness: codex
+    harness: antigravity
     authentication: subscription
-    model: gpt-5-codex
-    resources: { cpus: 2, ram: 4g }
+    model: gemini-3.8-flash
+    resources:
+      cpus: 1
+      ram: 2g
+
+  - id: devops
+    type: member
+    label: Devops Engineer
+    harness: pi
+    authentication: apiKey
+    model: anthropic/claude-sonnet-5-5
+    resources:
+      cpus: 1
+      ram: 2g
