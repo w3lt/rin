@@ -29,12 +29,12 @@ esac
 
 step fmt cargo fmt --all -- --check --color never
 step clippy cargo clippy -q --all-targets --all-features -- -D warnings
-[ "$mode" = fast ] && exit 0
+[[ "$mode" = fast ]] && exit 0
 
 step test cargo test -q --all-targets --all-features
 step image-build cargo check -q --locked --no-default-features --features hub,agent
 
-if [ "$mode" = matrix ]; then
+if [[ "$mode" = matrix ]]; then
     for f in host hub agent hub,agent host,hub host,agent ""; do
         step "clippy [${f:-none}]" cargo clippy -q --all-targets --no-default-features --features "$f" -- -D warnings
     done
