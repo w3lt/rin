@@ -210,7 +210,7 @@ async fn run(cli: Cli) -> Result<()> {
 async fn main() {
     let cli = Cli::parse();
     if let Err(e) = run(cli).await {
-        rinerrln!("rin: {e:#}");
+        rinerrln!("{e:#}");
         std::process::exit(1);
     }
 }

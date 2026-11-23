@@ -147,7 +147,7 @@ pub fn up(team: &Team) -> Result<()> {
     let keys_env = team::rin_home()?.join("keys.env");
     if !keys_env.is_file() && team.config().is_ok_and(|c| c.uses_api_keys()) {
         rinerrln!(
-            "rin: warning: {} is missing: API-key agents will fail. Add your provider keys, then run `rin generate` and `rin up`",
+            "warning: {} is missing: API-key agents will fail. Add your provider keys, then run `rin generate` and `rin up`",
             keys_env.display()
         );
     }
@@ -247,7 +247,7 @@ pub async fn log(team: &Team, follow: bool, agent: Option<&str>) -> Result<()> {
         match client.log(agent, after).await {
             Ok(page) => {
                 if std::mem::take(&mut lost) {
-                    rinerrln!("rin: following again");
+                    rinerrln!("following again");
                 }
                 let more = page.len() >= crate::proto::LOG_PAGE;
                 for event in page {
@@ -263,7 +263,7 @@ pub async fn log(team: &Team, follow: bool, agent: Option<&str>) -> Result<()> {
             }
             Err(e) if follow => {
                 if !std::mem::replace(&mut lost, true) {
-                    rinerrln!("rin: {e:#} (still following)");
+                    rinerrln!("{e:#} (still following)");
                 }
                 // The hub may come back with new tokens (`rin generate && rin up`).
                 if let Ok(fresh) = self::client(team) {

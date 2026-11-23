@@ -365,7 +365,7 @@ pub async fn main() -> Result<()> {
     )
     .context("cannot write harness settings")?;
     for path in written {
-        rinerrln!("rin runtime: updated {}", path.display());
+        rinerrln!("runtime: updated {}", path.display());
     }
     std::fs::create_dir_all(home.join("work")).context("cannot create ~/work")?;
 
@@ -376,7 +376,7 @@ pub async fn main() -> Result<()> {
         .await
         .context("cannot listen on 7001")?;
     rinerrln!(
-        "rin runtime: {} on {model}, listening on 7001",
+        "runtime: {} on {model}, listening on 7001",
         harness.as_str()
     );
     let app = router(runtime).into_make_service_with_connect_info::<SocketAddr>();

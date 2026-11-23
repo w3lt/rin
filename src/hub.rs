@@ -331,7 +331,7 @@ impl Hub {
         let fresh = self.sched().new_deadlocks(std::time::Instant::now());
         for deadlock in fresh {
             let text = deadlock.to_string();
-            rinerrln!("rin hub: {text}");
+            rinerrln!("hub: {text}");
             self.db.warning(&deadlock.agents, &text);
         }
     }
@@ -523,7 +523,7 @@ pub async fn main() -> Result<()> {
     let listener = tokio::net::TcpListener::bind(&listen)
         .await
         .with_context(|| format!("cannot listen on {listen}"))?;
-    rinerrln!("rin hub: team {} listening on {listen}", hub.config.name);
+    rinerrln!("hub: team {} listening on {listen}", hub.config.name);
     let app = router(hub).into_make_service_with_connect_info::<SocketAddr>();
     tokio::select! {
         result = axum::serve(listener, app) => result?,

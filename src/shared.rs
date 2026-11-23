@@ -3,7 +3,7 @@ pub mod config;
 #[macro_use]
 pub mod log;
 
-/// Returns early with an `anyhow` error prefixed with `[Rin]`.
+/// Returns early with an `anyhow` error, like `anyhow::bail!`; `main` prints it with `[Rin]`.
 #[macro_export]
 macro_rules! rin_bail {
     ($($arg:tt)*) => {

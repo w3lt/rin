@@ -105,7 +105,7 @@ impl Db {
             Ok(_) => conn.last_insert_rowid(),
             Err(e) => {
                 // The log must never take messaging down with it.
-                rinerrln!("rin hub: cannot write log: {e}");
+                rinerrln!("hub: cannot write log: {e}");
                 0
             }
         }

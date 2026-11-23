@@ -88,7 +88,7 @@ pub fn apply(home: &Path, settings: &Settings) -> Result<Vec<PathBuf>> {
                     })?,
                     // Without a route pi would send its Bifrost key straight to the provider.
                     None => rinerrln!(
-                        "rin runtime: pi model {:?} can't be routed through Bifrost: write it as anthropic/<model>, openai/<model> or google/<model>",
+                        "runtime: pi model {:?} can't be routed through Bifrost: write it as anthropic/<model>, openai/<model> or google/<model>",
                         settings.model
                     ),
                 }
