@@ -73,7 +73,7 @@ agents:
 
 > _"A proper magus prepares before the ritual."_
 
-**What you need:** [Docker](https://docs.docker.com/get-started/get-docker/) with Compose 2.24 or later (Docker Desktop, or Docker Engine with the Compose plugin), and Rust's [`cargo`](https://rustup.rs/) to install Rin.
+**What you need:** [Docker](https://docs.docker.com/get-started/get-docker/) with Compose 5.6 or later (Docker Desktop, or Docker Engine with the Compose plugin), and Rust's [`cargo`](https://rustup.rs/) to install Rin.
 
 ### 1 ・ Summon Rin
 
