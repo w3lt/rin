@@ -314,7 +314,7 @@ pub fn init_project(name: Option<String>, dir: PathBuf) -> Result<()> {
         rin_bail!("{} is not a directory", path.display());
     }
     let rin_yml = path.join("rin.yml");
-    if rin_yml.exists() {
+    if rin_yml.symlink_metadata().is_ok() {
         rin_bail!("{} is already a Rin project", path.display());
     }
     let yaml = format!(
@@ -322,12 +322,15 @@ pub fn init_project(name: Option<String>, dir: PathBuf) -> Result<()> {
         config::rin_yaml_schema_directive(),
         serde_saphyr::to_string(&config)?
     );
-    let mut writes = vec![(rin_yml, yaml)];
+    let mut writes = Vec::new();
     for (agent, text) in config.agents.iter().zip(instructions) {
         let file = path.join("agents").join(&agent.id).join("INSTRUCTIONS.md");
         writes.push((file, text));
     }
-    if let Some((file, _)) = writes.iter().find(|(file, _)| file.exists()) {
+    // Last, so a project with a rin.yml is a complete one.
+    writes.push((rin_yml, yaml));
+    // `symlink_metadata`, not `exists`: never write through a dangling link.
+    if let Some((file, _)) = writes.iter().find(|(f, _)| f.symlink_metadata().is_ok()) {
         rin_bail!("{} already exists; move it away first", file.display());
     }
 
