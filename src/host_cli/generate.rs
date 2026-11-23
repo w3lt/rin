@@ -758,13 +758,18 @@ mod tests {
         let f = Fixture::new("remove");
         f.generate().unwrap();
         let text = fs::read_to_string(f.root.join("project/rin.yml")).unwrap();
-        let cut = text.find("  - id: devops").unwrap();
+        // Cuts frontend (subscription) and devops (API key), the last two agents.
+        let cut = text.find("  - id: frontend").unwrap();
         fs::write(f.root.join("project/rin.yml"), &text[..cut]).unwrap();
-        fs::remove_dir_all(f.root.join("project/agents/devops")).unwrap();
+        for id in ["frontend", "devops"] {
+            fs::remove_dir_all(f.root.join("project/agents").join(id)).unwrap();
+        }
         f.generate().unwrap();
-        assert!(!f.team().join("env/devops.env").exists());
-        assert!(!f.team().join("instructions/devops").exists());
         let tokens: Tokens = serde_json::from_str(&f.read("tokens.json")).unwrap();
-        assert!(!tokens.contains_key("devops"));
+        for id in ["frontend", "devops"] {
+            assert!(!f.team().join(format!("env/{id}.env")).exists(), "{id}");
+            assert!(!f.team().join("instructions").join(id).exists(), "{id}");
+            assert!(!tokens.contains_key(id), "{id}");
+        }
     }
 }
