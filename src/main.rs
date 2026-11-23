@@ -97,7 +97,7 @@ enum HostCmd {
     Completions {
         shell: Shell,
     },
-    /// Write a starter project (rin.yml and agents/<id>/INSTRUCTIONS.md) to DIR/NAME.
+    /// Create a new Rin project in DIR/NAME (rin.yml and agents/<id>/INSTRUCTIONS.md).
     Init {
         /// Folder to create the project folder in.
         #[arg(short = 'd', long = "dir", default_value = ".", value_name = "DIR")]

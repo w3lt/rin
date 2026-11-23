@@ -12,7 +12,7 @@ use crate::{display, shared::config};
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::os::unix::process::CommandExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
@@ -304,40 +304,59 @@ pub fn generate_config(config_file: PathBuf, instructions: PathBuf) -> Result<()
 /// `agents/<id>/INSTRUCTIONS.md` per agent. Writes nothing if any of them exists.
 pub fn init_project(name: Option<String>, dir: PathBuf) -> Result<()> {
     let name = name.unwrap_or_else(config::Config::dummy_team_name);
+    config::check_team_name(&name)?;
     let (config, instructions) = config::Config::init(name);
-    // The schema's name pattern also keeps the name one plain path component.
-    config::from_value(serde_json::to_value(&config)?)
-        .with_context(|| format!("cannot init team {:?}", config.name))?;
 
     let path = dir.join(&config.name);
-    if path.exists() && !path.is_dir() {
-        rin_bail!("{} is not a directory", path.display());
-    }
+    ensure_project_dir(&path)?;
     let rin_yml = path.join("rin.yml");
-    if rin_yml.symlink_metadata().is_ok() {
-        rin_bail!("{} is already a Rin project", path.display());
-    }
     let yaml = format!(
         "{}\n{}",
         config::rin_yaml_schema_directive(),
         serde_saphyr::to_string(&config)?
     );
-    let mut writes = Vec::new();
-    for (agent, text) in config.agents.iter().zip(instructions) {
-        let file = path.join("agents").join(&agent.id).join("INSTRUCTIONS.md");
-        writes.push((file, text));
-    }
-    // Last, so a project with a rin.yml is a complete one.
-    writes.push((rin_yml, yaml));
-    // `symlink_metadata`, not `exists`: never write through a dangling link.
-    if let Some((file, _)) = writes.iter().find(|(f, _)| f.symlink_metadata().is_ok()) {
-        rin_bail!("{} already exists; move it away first", file.display());
-    }
+    let writes: Vec<(PathBuf, String)> = config
+        .agents
+        .iter()
+        .zip(instructions)
+        .map(|(agent, text)| {
+            let file = path.join("agents").join(&agent.id).join("INSTRUCTIONS.md");
+            (file, text)
+        })
+        // Last, so a project with a rin.yml is a complete one.
+        .chain([(rin_yml, yaml)])
+        .collect();
+    ensure_nothing_to_overwrite(&path, &writes)?;
 
     for (file, text) in &writes {
         files::write_if_changed(file, text.as_bytes())?;
     }
     rinlogln!("Done! Happy hacking with Rin!");
+    Ok(())
+}
+
+/// `path` is a directory, or nothing yet.
+fn ensure_project_dir(path: &Path) -> Result<()> {
+    if path.exists() && !path.is_dir() {
+        rin_bail!("{} is not a directory", path.display());
+    }
+    Ok(())
+}
+
+/// None of the files `init` would write exist yet.
+fn ensure_nothing_to_overwrite(path: &Path, writes: &[(PathBuf, String)]) -> Result<()> {
+    // `symlink_metadata`, not `exists`: never write through a dangling link.
+    let existing: Vec<&PathBuf> = writes
+        .iter()
+        .map(|(file, _)| file)
+        .filter(|file| file.symlink_metadata().is_ok())
+        .collect();
+    if existing.iter().any(|file| file.ends_with("rin.yml")) {
+        rin_bail!("{} is already a Rin project", path.display());
+    }
+    if let Some(file) = existing.first() {
+        rin_bail!("{} already exists; move it away first", file.display());
+    }
     Ok(())
 }
 
@@ -451,7 +470,10 @@ mod tests {
         let outside = s.0.join("outside");
         for name in ["Bad Name", "../outside", outside.to_str().unwrap(), ""] {
             let e = init_project(Some(name.into()), s.0.join("dir")).unwrap_err();
-            assert!(format!("{e:#}").contains("/name"), "{name}: {e:#}");
+            assert!(
+                format!("{e:#}").contains("invalid team name"),
+                "{name}: {e:#}"
+            );
         }
         assert!(!s.0.join("dir").exists() && !outside.exists());
     }

@@ -396,6 +396,19 @@ pub fn from_value(value: serde_json::Value) -> anyhow::Result<Config> {
     Ok(config)
 }
 
+/// Checks a team name against the schema's `name` pattern, which also keeps it
+/// one plain path component (no `/`, `..` or spaces).
+#[cfg(feature = "host")]
+pub fn check_team_name(name: &str) -> anyhow::Result<()> {
+    let schema: serde_json::Value = serde_json::from_str(SCHEMA).expect("embedded schema is JSON");
+    let validator =
+        jsonschema::validator_for(&schema["properties"]["name"]).expect("embedded schema is valid");
+    if let Some(e) = validator.iter_errors(&serde_json::json!(name)).next() {
+        rin_bail!("invalid team name: {e}");
+    }
+    Ok(())
+}
+
 #[cfg(feature = "host")]
 pub fn rin_yaml_schema_directive() -> String {
     format!(
