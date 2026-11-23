@@ -63,7 +63,10 @@ agents:
     harness: claude-code
     authentication: subscription
     model: claude-opus-5-5
-    resources: { cpus: 2, ram: 4g }
+    maxSessions: 3
+    resources:
+      cpus: 1
+      ram: 2g
 ```
 
 …plus an `INSTRUCTIONS.md` that tells them who they are and what they own. The [full example config](examples/team/rin.yml) is a good place to start.
@@ -74,15 +77,16 @@ agents:
 
 > _"A proper magus prepares before the ritual."_
 
-**What you need:** [Docker](https://docs.docker.com/get-started/get-docker/) with Compose 5.6 or later (Docker Desktop, or Docker Engine with the Compose plugin), and Rust's [`cargo`](https://rustup.rs/) to install Rin.
+**What you need:** [Docker](https://docs.docker.com/get-started/get-docker/) with Compose 5.6 or later (Docker Desktop, or Docker Engine with the Compose plugin), and [Homebrew](https://brew.sh/) or Rust's [`cargo`](https://rustup.rs/) to install Rin.
 
 ### 1 ・ Summon Rin
 
 ```sh
-cargo install --git https://github.com/w3lt/rin --tag v0.1.0 tohsaka
+brew install w3lt/tap/rin        # macOS (Apple silicon) or Linux
+cargo install --locked tohsaka   # or from crates.io, on any platform
 ```
 
-The package is called `tohsaka`. The command you get is `rin`.
+On crates.io the package is called `tohsaka`. The command you get is `rin`. Its version must match `version:` in `rin.yml` (0.1.1 in the example). Homebrew also sets up shell completions; with `cargo`, `rin completions <shell>` prints them.
 
 ### 2 ・ Hand over the keys
 
@@ -142,23 +146,24 @@ rin down       # good night, everyone
 
 <sup>EPISODE 4 ・ 第四話</sup>
 
-| Spell                               | What it does                                                                     |
-| :---------------------------------- | :------------------------------------------------------------------------------- |
-| `rin generate --instructions <dir>` | Checks `rin.yml` and prepares the team. Makes it the current team.               |
-| `rin up`                            | Starts the team. Builds the images the first time.                               |
-| `rin down`                          | Stops the team. Homes and the message log are kept.                              |
-| `rin shell <id>`                    | Opens a shell in an agent's container.                                           |
-| `rin send <id> "<text>"`            | Messages an agent and prints its reply.                                          |
-| `rin agents`                        | Lists the team's agents.                                                         |
-| `rin status`                        | Shows each agent's state, sessions and queues, and warns about deadlocks.        |
-| `rin log [-f] [<id>]`               | Shows the message history. `-f` keeps following, `<id>` narrows it to one agent. |
-| `rin use <name>`                    | Switches the current team.                                                       |
+| Spell                               | What it does                                                                        |
+| :---------------------------------- | :---------------------------------------------------------------------------------- |
+| `rin generate --instructions <dir>` | Checks `rin.yml` (or `-f <file>`) and prepares the team. Makes it the current team. |
+| `rin up`                            | Starts the team. Builds the images the first time.                                  |
+| `rin down`                          | Stops the team. Homes and the message log are kept.                                 |
+| `rin shell <id>`                    | Opens a shell in an agent's container.                                              |
+| `rin send <id> "<text>"`            | Messages an agent and prints its reply.                                             |
+| `rin agents`                        | Lists the team's agents.                                                            |
+| `rin status`                        | Shows each agent's state, sessions and queues, and warns about deadlocks.           |
+| `rin log [-f] [<id>]`               | Shows the message history. `-f` keeps following, `<id>` narrows it to one agent.    |
+| `rin use <name>`                    | Switches the current team.                                                          |
+| `rin completions <shell>`           | Prints shell completions (bash, zsh, fish, elvish, powershell).                     |
 
 ## 🏯 House rules
 
 <sup>EPISODE 5 ・ 第五話</sup>
 
-- **Rin remembers your team.** Every command except `generate` acts on the current team, from any directory. Add `--team <name>` to pick another one, or `rin use <name>` to switch.
+- **Rin remembers your team.** Every command except `generate` and `completions` acts on the current team, from any directory. Add `--team <name>` to pick another one, or `rin use <name>` to switch.
 - **One team at a time.** Only one team can be up at once (each publishes its hub on `127.0.0.1:10302`).
 - **Agents talk among themselves.** Inside their containers they message each other with the `send_message` and `list_agents` MCP tools (Claude Code, Codex, Antigravity), or with `rin send <id> "<text>"` and `rin agents` (pi).
 - **Want the full story?** The design and success criteria live in [issue #1](https://github.com/w3lt/rin/issues/1).
@@ -176,6 +181,7 @@ rin down       # good night, everyone
 scripts/verify_code.sh         # fmt, clippy, tests (incl. hub/runtime end to end with a fake harness), image build
 scripts/verify_code.sh matrix  # + clippy on every feature subset; what the pre-commit hook runs
 scripts/verify_docker.sh       # needs Docker: a throwaway team up and down, images built from HEAD as pushed
+scripts/inspect_environment.sh # checks git, the Rust toolchain, Docker and Compose versions
 git config core.hooksPath .githooks   # once per clone, to enable the hooks
 ```
 
