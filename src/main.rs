@@ -99,16 +99,16 @@ enum HostCmd {
     },
     /// Create a new Rin project in DIR/NAME (rin.yml and agents/<id>/INSTRUCTIONS.md).
     Init {
-        /// Folder to create the project folder in.
+        /// Directory to create the project directory in.
         #[arg(short = 'd', long = "dir", default_value = ".", value_name = "DIR")]
         directory: PathBuf,
 
-        /// Team name, also the project folder's name [default: rinteam]
+        /// Team name, also the project directory's name [default: rinteam]
         name: Option<String>,
     },
-    /// Validate rin.yml and write the team's folder in $RIN_HOME; makes it the current team.
+    /// Validate rin.yml and write the team's directory in $RIN_HOME; makes it the current team.
     Generate {
-        /// Folder with one <agent id>/INSTRUCTIONS.md per agent.
+        /// Directory with one <agent id>/INSTRUCTIONS.md per agent.
         #[arg(long, value_name = "DIR")]
         instructions: PathBuf,
         /// The team config.

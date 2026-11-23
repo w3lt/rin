@@ -1,4 +1,4 @@
-//! `rin generate`: validate `rin.yml` + `agents/` and write the team's folder in `$RIN_HOME`.
+//! `rin generate`: validate `rin.yml` + `agents/` and write the team's directory in `$RIN_HOME`.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -49,7 +49,7 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
     let new_home = !home.exists();
     fs::create_dir_all(&team.dir)
         .with_context(|| format!("cannot create {}", team.dir.display()))?;
-    // Only lock down what Rin made: $RIN_HOME may be a folder you use for more.
+    // Only lock down what Rin made: $RIN_HOME may be a directory you use for more.
     if new_home {
         crate::files::set_mode(home, 0o700)?;
     }
@@ -109,10 +109,10 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
     Ok(Generated { team, warnings })
 }
 
-/// Every agent has `<dir>/<id>/INSTRUCTIONS.md`, and every folder is an agent.
+/// Every agent has `<dir>/<id>/INSTRUCTIONS.md`, and every directory is an agent.
 fn check_instructions(config: &Config, dir: &Path) -> Result<Vec<(String, PathBuf)>> {
     if !dir.is_dir() {
-        rin_bail!("instructions folder {} not found", dir.display());
+        rin_bail!("instructions directory {} not found", dir.display());
     }
     let mut problems = Vec::new();
     let mut entries: Vec<_> = fs::read_dir(dir)
@@ -131,16 +131,19 @@ fn check_instructions(config: &Config, dir: &Path) -> Result<Vec<(String, PathBu
     }
     let mut sources = Vec::new();
     for agent in &config.agents {
-        let folder = dir.join(&agent.id);
-        let file = folder.join("INSTRUCTIONS.md");
-        if !folder.is_dir() {
+        let agent_dir = dir.join(&agent.id);
+        let file = agent_dir.join("INSTRUCTIONS.md");
+        if !agent_dir.is_dir() {
             problems.push(format!(
-                "agent {:?} has no folder {}",
+                "agent {:?} has no directory {}",
                 agent.id,
-                folder.display()
+                agent_dir.display()
             ));
         } else if !file.is_file() {
-            problems.push(format!("{}: INSTRUCTIONS.md is missing", folder.display()));
+            problems.push(format!(
+                "{}: INSTRUCTIONS.md is missing",
+                agent_dir.display()
+            ));
         } else {
             sources.push((agent.id.clone(), file));
         }
@@ -196,7 +199,7 @@ fn check_names(home: &Path, config: &Config) -> Result<()> {
         if name == config.name {
             continue;
         }
-        // A team folder Rin can't read (another version, half deleted) has no say.
+        // A team directory Rin can't read (another version, half deleted) has no say.
         let Ok(other) = Team::at(home, &name).config() else {
             continue;
         };
@@ -364,7 +367,7 @@ mod tests {
         )
     }
 
-    /// A project folder (copy of examples/team, edited) and an empty `$RIN_HOME`.
+    /// A project directory (copy of examples/team, edited) and an empty `$RIN_HOME`.
     struct Fixture {
         root: PathBuf,
     }
@@ -417,7 +420,7 @@ mod tests {
             fs::read_to_string(self.team().join(path)).unwrap()
         }
 
-        /// Every file in the team folder → its bytes.
+        /// Every file in the team directory → its bytes.
         fn snapshot(&self) -> BTreeMap<PathBuf, Vec<u8>> {
             fn walk(dir: &Path, out: &mut BTreeMap<PathBuf, Vec<u8>>) {
                 for entry in fs::read_dir(dir).unwrap().flatten() {
@@ -442,7 +445,7 @@ mod tests {
     }
 
     #[test]
-    fn writes_the_team_folder() {
+    fn writes_the_team_directory() {
         let f = Fixture::new("c1");
         let generated = f.generate().unwrap();
         assert!(generated.warnings.is_empty(), "{:?}", generated.warnings);
@@ -733,7 +736,7 @@ mod tests {
 
         fs::remove_dir_all(f.root.join("project/agents/frontend")).unwrap();
         let e = format!("{:#}", f.generate().unwrap_err());
-        assert!(e.contains("agent \"frontend\" has no folder"), "{e}");
+        assert!(e.contains("agent \"frontend\" has no directory"), "{e}");
         assert!(!f.team().exists(), "nothing written for a rejected config");
     }
 

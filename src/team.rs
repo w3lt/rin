@@ -1,4 +1,4 @@
-//! `$RIN_HOME` and the generated team folders in it.
+//! `$RIN_HOME` and the generated team directories in it.
 
 use crate::rin_bail;
 use anyhow::{Context, Result, anyhow};
@@ -58,7 +58,7 @@ impl Team {
                 name.trim().to_string()
             }
         };
-        // One folder in teams/, never a path: `my-team/` would become the current
+        // One directory in teams/, never a path: `my-team/` would become the current
         // team as written, and then be no Compose project name.
         if Path::new(&name).file_name() != Some(std::ffi::OsStr::new(&name)) {
             rin_bail!("unknown team {name:?}: a team is named as in its rin.yml");

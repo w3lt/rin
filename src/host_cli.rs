@@ -393,14 +393,14 @@ mod tests {
         assert!(yaml.starts_with(&format!("{}\n", config::rin_yaml_schema_directive())));
         assert_eq!(config::from_yaml(&yaml).unwrap(), expected);
 
-        let mut folders: Vec<_> = fs::read_dir(project.join("agents"))
+        let mut dirs: Vec<_> = fs::read_dir(project.join("agents"))
             .unwrap()
             .map(|e| e.unwrap().file_name().into_string().unwrap())
             .collect();
-        folders.sort();
+        dirs.sort();
         let mut ids: Vec<_> = expected.agents.iter().map(|a| a.id.clone()).collect();
         ids.sort();
-        assert_eq!(folders, ids);
+        assert_eq!(dirs, ids);
         for (agent, text) in expected.agents.iter().zip(&instructions) {
             let file = project
                 .join("agents")
