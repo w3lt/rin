@@ -6,7 +6,7 @@
 
 **One config file. One command. A whole team of AI agents on your machine.**
 
-*「 You write the config. I'll take care of the rest. 」*
+_「 You write the config. I'll take care of the rest. 」_
 
 <br>
 
@@ -28,29 +28,30 @@
 
 One AI agent is handy. A whole **team** of them, with an architect who plans, engineers who build, and everyone talking to each other, gets a lot more done. Putting that team together by hand is the boring part.
 
-**Rin** (yes, *that* Tohsaka) does the boring part. You describe your team in one file, and she brings it to life on your own machine:
+**Rin** (yes, _that_ Tohsaka) does the boring part. You describe your team in one file, and she brings it to life on your own machine:
 
 - 🏠 &nbsp;**A room for everyone.** Each agent lives in its own Docker container and keeps its home when the team restarts.
 - 🧠 &nbsp;**Any brain you like.** Each agent runs Claude Code, Codex, Antigravity or pi. Mix them freely in one team.
 - 👑 &nbsp;**One leads, everyone talks.** A leader splits up the work and hands it out. You can still talk to any agent yourself, and they can message each other.
 - 🔁 &nbsp;**Same team, every time.** The same config brings back the same team, on any machine.
 
-> *"Don't get the wrong idea. I'm not doing this for you. A good team simply deserves a proper setup."*<br>
+> _"Don't get the wrong idea. I'm not doing this for you. A good team simply deserves a proper setup."_<br>
 > — Rin, probably
 
 ## 🎭 The cast
 
 <sup>EPISODE 2 ・ 第二話</sup>
 
-The example in [`examples/team`](examples/team) stars three agents:
+The example in [`examples/team`](examples/team) stars four agents:
 
-<img src="assets/team.svg" alt="You talk to rin, the leader. rin delegates to backend and frontend, then reviews their work. The agents message each other, and you can talk to any of them directly. Every agent lives in its own Docker container." width="100%">
+<img src="assets/team.svg" alt="You talk to rin, the leader. rin delegates to backend, frontend and devops, then reviews their work. The agents message each other, and you can talk to any of them directly. Every agent lives in its own Docker container." width="100%">
 
-| | Agent | Role | Runs |
-|:-:|:--|:--|:--|
-| 👑 | **`rin`** | **Chief Architect.** Leads the team: breaks work down, delegates, and reviews what comes back. | Claude Code |
-| ⚙️ | **`backend`** | **Backend Engineer.** Owns APIs, data and services. | pi |
-| 🎨 | **`frontend`** | **Frontend Engineer.** Owns the user interface. | Codex |
+|     | Agent          | Role                                                                                           | Runs        |
+| :-: | :------------- | :--------------------------------------------------------------------------------------------- | :---------- |
+| 👑  | **`rin`**      | **Chief Architect.** Leads the team: breaks work down, delegates, and reviews what comes back. | Claude Code |
+| ⚙️  | **`backend`**  | **Backend Engineer.** Owns APIs, data and services.                                            | Codex       |
+| 🎨  | **`frontend`** | **Frontend Engineer.** Owns the user interface.                                                | Antigravity |
+| 🛠️  | **`devops`**   | **DevOps Engineer.** Owns infrastructure, CI/CD and deployments.                               | pi          |
 
 The casting is up to you. Every agent is a few lines in `rin.yml`:
 
@@ -62,7 +63,10 @@ agents:
     harness: claude-code
     authentication: subscription
     model: claude-opus-5-5
-    resources: { cpus: 2, ram: 4g }
+    maxSessions: 3
+    resources:
+      cpus: 1
+      ram: 2g
 ```
 
 …plus an `INSTRUCTIONS.md` that tells them who they are and what they own. The [full example config](examples/team/rin.yml) is a good place to start.
@@ -71,21 +75,22 @@ agents:
 
 <sup>EPISODE 3 ・ 第三話</sup>
 
-> *"A proper magus prepares before the ritual."*
+> _"A proper magus prepares before the ritual."_
 
-**What you need:** [Docker](https://docs.docker.com/get-started/get-docker/) with Compose 2.24 or later (Docker Desktop, or Docker Engine with the Compose plugin), and Rust's [`cargo`](https://rustup.rs/) to install Rin.
+**What you need:** [Docker](https://docs.docker.com/get-started/get-docker/) with Compose 5.6 or later (Docker Desktop, or Docker Engine with the Compose plugin), and [Homebrew](https://brew.sh/) or Rust's [`cargo`](https://rustup.rs/) to install Rin.
 
 ### 1 ・ Summon Rin
 
 ```sh
-cargo install --git https://github.com/w3lt/rin --tag v0.1.0 tohsaka
+brew install w3lt/tap/rin        # macOS (Apple silicon) or Linux
+cargo install --locked tohsaka   # or from crates.io, on any platform
 ```
 
-The package is called `tohsaka`. The command you get is `rin`.
+On crates.io the package is called `tohsaka`. The command you get is `rin`. Its version must match `version:` in `rin.yml` (0.1.1 in the example). Homebrew also sets up shell completions; with `cargo`, `rin completions <shell>` prints them.
 
 ### 2 ・ Hand over the keys
 
-Only for agents that use an API key. Agents that sign in with a subscription skip this step. The example team's `backend` uses a key, so it needs `ANTHROPIC_API_KEY` here.
+Only for agents that use an API key. Agents that sign in with a subscription skip this step. The example team's `devops` uses a key, so it needs `ANTHROPIC_API_KEY` here.
 
 ```sh
 mkdir -p -m 700 ~/.rin && touch ~/.rin/keys.env && chmod 600 ~/.rin/keys.env
@@ -115,7 +120,7 @@ The first run builds the images, so there is time for tea. ☕
 
 ### 5 ・ Say hello
 
-Agents on a subscription need you to sign in once. Step into their room and run their own tool (`claude` for Rin, `codex` for `frontend`):
+Agents on a subscription need you to sign in once. Step into their room and run their own tool (`claude` for Rin, `codex` for `backend`, `agy` for `frontend`):
 
 ```sh
 rin shell rin
@@ -141,23 +146,24 @@ rin down       # good night, everyone
 
 <sup>EPISODE 4 ・ 第四話</sup>
 
-| Spell | What it does |
-|:--|:--|
-| `rin generate --instructions <dir>` | Checks `rin.yml` and prepares the team. Makes it the current team. |
-| `rin up` | Starts the team. Builds the images the first time. |
-| `rin down` | Stops the team. Homes and the message log are kept. |
-| `rin shell <id>` | Opens a shell in an agent's container. |
-| `rin send <id> "<text>"` | Messages an agent and prints its reply. |
-| `rin agents` | Lists the team's agents. |
-| `rin status` | Shows each agent's state, sessions and queues, and warns about deadlocks. |
-| `rin log [-f] [<id>]` | Shows the message history. `-f` keeps following, `<id>` narrows it to one agent. |
-| `rin use <name>` | Switches the current team. |
+| Spell                               | What it does                                                                        |
+| :---------------------------------- | :---------------------------------------------------------------------------------- |
+| `rin generate --instructions <dir>` | Checks `rin.yml` (or `-f <file>`) and prepares the team. Makes it the current team. |
+| `rin up`                            | Starts the team. Builds the images the first time.                                  |
+| `rin down`                          | Stops the team. Homes and the message log are kept.                                 |
+| `rin shell <id>`                    | Opens a shell in an agent's container.                                              |
+| `rin send <id> "<text>"`            | Messages an agent and prints its reply.                                             |
+| `rin agents`                        | Lists the team's agents.                                                            |
+| `rin status`                        | Shows each agent's state, sessions and queues, and warns about deadlocks.           |
+| `rin log [-f] [<id>]`               | Shows the message history. `-f` keeps following, `<id>` narrows it to one agent.    |
+| `rin use <name>`                    | Switches the current team.                                                          |
+| `rin completions <shell>`           | Prints shell completions (bash, zsh, fish, elvish, powershell).                     |
 
 ## 🏯 House rules
 
 <sup>EPISODE 5 ・ 第五話</sup>
 
-- **Rin remembers your team.** Every command except `generate` acts on the current team, from any directory. Add `--team <name>` to pick another one, or `rin use <name>` to switch.
+- **Rin remembers your team.** Every command except `generate` and `completions` acts on the current team, from any directory. Add `--team <name>` to pick another one, or `rin use <name>` to switch.
 - **One team at a time.** Only one team can be up at once (each publishes its hub on `127.0.0.1:10302`).
 - **Agents talk among themselves.** Inside their containers they message each other with the `send_message` and `list_agents` MCP tools (Claude Code, Codex, Antigravity), or with `rin send <id> "<text>"` and `rin agents` (pi).
 - **Want the full story?** The design and success criteria live in [issue #1](https://github.com/w3lt/rin/issues/1).
@@ -172,8 +178,11 @@ rin down       # good night, everyone
 <br>
 
 ```sh
-cargo test --all-features    # unit tests + hub/runtime end to end with a fake harness
-cargo clippy --all-features --all-targets
+scripts/verify_code.sh         # fmt, clippy, tests (incl. hub/runtime end to end with a fake harness), image build
+scripts/verify_code.sh matrix  # + clippy on every feature subset; what the pre-commit hook runs
+scripts/verify_docker.sh       # needs Docker: a throwaway team up and down, images built from HEAD as pushed
+scripts/inspect_environment.sh # checks git, the Rust toolchain, Docker and Compose versions
+git config core.hooksPath .githooks   # once per clone, to enable the hooks
 ```
 
 The binary has three feature sets: `host` (default: the commands above),
@@ -196,7 +205,7 @@ the same branch rebuild with
 
 Licensed under MIT or Apache-2.0, whichever you prefer.
 
-*She is the best waifu, btw.* &nbsp;(๑•̀ㅂ•́)و✧
+_She is the best waifu, btw._ &nbsp;(๑•̀ㅂ•́)و✧
 
 <sub>A fan-named project, not affiliated with or endorsed by TYPE-MOON. The artwork in this README is original.</sub>
 
