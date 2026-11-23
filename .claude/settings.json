@@ -30,6 +30,10 @@
     ],
     "defaultMode": "auto"
   },
+  "attribution": {
+    "pr": "",
+    "commit": ""
+  },
   "hooks": {
     "SessionStart": [
       {
