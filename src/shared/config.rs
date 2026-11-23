@@ -123,7 +123,7 @@ pub enum Authentication {
 }
 
 impl Agent {
-    /// This is ONLY used in Config::init. Use your FUCKING EYE to read BEFORE calling it anywhere else.
+    /// Starter agents for [`Config::init`], each with its `INSTRUCTIONS.md` text.
     fn dummy_leader() -> (Agent, String) {
         (
             Agent {
@@ -132,7 +132,7 @@ impl Agent {
                 label: "Rin Lead".to_string(),
                 harness: Harness::ClaudeCode,
                 authentication: Authentication::Subscription,
-                model: "claude-5.5-opus".to_string(),
+                model: "claude-opus-5-5".to_string(),
                 max_sessions: default_max_sessions(),
                 resources: Resources {
                     cpus: serde_json::Number::from(1),
@@ -204,7 +204,7 @@ need; `list_agents` shows the team."
                 label: "DevOps Engineer".to_string(),
                 harness: Harness::Pi,
                 authentication: Authentication::ApiKey,
-                model: "ollama/inkling-2-small".to_string(),
+                model: "anthropic/claude-sonnet-5-5".to_string(),
                 max_sessions: default_max_sessions(),
                 resources: Resources {
                     cpus: serde_json::Number::from(1),

@@ -148,6 +148,7 @@ rin down       # good night, everyone
 
 | Spell                               | What it does                                                                        |
 | :---------------------------------- | :---------------------------------------------------------------------------------- |
+| `rin init [<name>]`                 | Writes a starter `rin.yml` and agents to `./<name>`. `-d <dir>` picks the parent.   |
 | `rin generate --instructions <dir>` | Checks `rin.yml` (or `-f <file>`) and prepares the team. Makes it the current team. |
 | `rin up`                            | Starts the team. Builds the images the first time.                                  |
 | `rin down`                          | Stops the team. Homes and the message log are kept.                                 |
@@ -163,7 +164,7 @@ rin down       # good night, everyone
 
 <sup>EPISODE 5 ・ 第五話</sup>
 
-- **Rin remembers your team.** Every command except `generate` and `completions` acts on the current team, from any directory. Add `--team <name>` to pick another one, or `rin use <name>` to switch.
+- **Rin remembers your team.** Every command except `init`, `generate` and `completions` acts on the current team, from any directory. Add `--team <name>` to pick another one, or `rin use <name>` to switch.
 - **One team at a time.** Only one team can be up at once (each publishes its hub on `127.0.0.1:10302`).
 - **Agents talk among themselves.** Inside their containers they message each other with the `send_message` and `list_agents` MCP tools (Claude Code, Codex, Antigravity), or with `rin send <id> "<text>"` and `rin agents` (pi).
 - **Want the full story?** The design and success criteria live in [issue #1](https://github.com/w3lt/rin/issues/1).

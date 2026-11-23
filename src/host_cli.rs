@@ -11,9 +11,7 @@ use crate::team::{self, Team};
 use crate::{display, shared::config};
 use anyhow::{Context, Result};
 use std::collections::HashMap;
-use std::fs;
 use std::os::unix::process::CommandExt;
-use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
@@ -302,55 +300,48 @@ pub fn generate_config(config_file: PathBuf, instructions: PathBuf) -> Result<()
     Ok(())
 }
 
-pub fn init_project(name: Option<String>, path: PathBuf) -> Result<()> {
-    let name = name.unwrap_or(config::Config::dummy_team_name());
-    let path = path.join(&name);
-    ensure_project_dir(&path)?;
-    ensure_not_initialized(&path)?;
-
+/// Writes a starter project to `<dir>/<name>`: `rin.yml` and one
+/// `agents/<id>/INSTRUCTIONS.md` per agent. Writes nothing if any of them exists.
+pub fn init_project(name: Option<String>, dir: PathBuf) -> Result<()> {
+    let name = name.unwrap_or_else(config::Config::dummy_team_name);
     let (config, instructions) = config::Config::init(name);
+    // The schema's name pattern also keeps the name one plain path component.
+    config::from_value(serde_json::to_value(&config)?)
+        .with_context(|| format!("cannot init team {:?}", config.name))?;
 
-    let config_path = path.join("rin.yml");
+    let path = dir.join(&config.name);
+    if path.exists() && !path.is_dir() {
+        rin_bail!("{} is not a directory", path.display());
+    }
+    let rin_yml = path.join("rin.yml");
+    if rin_yml.exists() {
+        rin_bail!("{} is already a Rin project", path.display());
+    }
     let yaml = format!(
         "{}\n{}",
         config::rin_yaml_schema_directive(),
         serde_saphyr::to_string(&config)?
     );
-    files::write_if_changed(&config_path, yaml.as_bytes())?;
-
-    for (agent, text) in config.agents.iter().zip(&instructions) {
-        files::write_if_changed(
-            &path.join("agents").join(&agent.id).join("INSTRUCTIONS.md"),
-            text.as_bytes(),
-        )?;
+    let mut writes = vec![(rin_yml, yaml)];
+    for (agent, text) in config.agents.iter().zip(instructions) {
+        let file = path.join("agents").join(&agent.id).join("INSTRUCTIONS.md");
+        writes.push((file, text));
+    }
+    if let Some((file, _)) = writes.iter().find(|(file, _)| file.exists()) {
+        rin_bail!("{} already exists; move it away first", file.display());
     }
 
+    for (file, text) in &writes {
+        files::write_if_changed(file, text.as_bytes())?;
+    }
     rinlogln!("Done! Happy hacking with Rin!");
-
-    Ok(())
-}
-
-fn ensure_project_dir(path: &Path) -> Result<()> {
-    if path.exists() && !path.is_dir() {
-        rin_bail!("{} is not a directory", path.display());
-    }
-
-    fs::create_dir_all(path).with_context(|| format!("Cannot create {}", path.display()))?;
-    Ok(())
-}
-
-fn ensure_not_initialized(path: &Path) -> Result<()> {
-    let rin_path = path.join("rin.yml");
-    if rin_path.is_file() {
-        rin_bail!("{} is already a Rin project", path.display());
-    }
-
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     struct Scratch(PathBuf);
 
@@ -417,6 +408,49 @@ mod tests {
         let e = init_project(Some("my-team".into()), s.0.clone()).unwrap_err();
         assert!(format!("{e:#}").contains("is not a directory"), "{e:#}");
         assert_eq!(fs::read_to_string(s.0.join("my-team")).unwrap(), "mine");
+    }
+
+    #[test]
+    fn init_refuses_an_existing_project() {
+        let s = Scratch::new("again");
+        init_project(Some("my-team".into()), s.0.clone()).unwrap();
+        fs::write(s.0.join("my-team/rin.yml"), "mine").unwrap();
+        let e = init_project(Some("my-team".into()), s.0.clone()).unwrap_err();
+        assert!(
+            format!("{e:#}").contains("is already a Rin project"),
+            "{e:#}"
+        );
+        assert_eq!(
+            fs::read_to_string(s.0.join("my-team/rin.yml")).unwrap(),
+            "mine"
+        );
+    }
+
+    #[test]
+    fn init_keeps_existing_instructions() {
+        let s = Scratch::new("keep");
+        let mine = s.0.join("my-team/agents/backend/INSTRUCTIONS.md");
+        fs::create_dir_all(mine.parent().unwrap()).unwrap();
+        fs::write(&mine, "mine").unwrap();
+        let e = init_project(Some("my-team".into()), s.0.clone()).unwrap_err();
+        assert!(format!("{e:#}").contains("already exists"), "{e:#}");
+        assert_eq!(fs::read_to_string(&mine).unwrap(), "mine");
+        assert!(!s.0.join("my-team/rin.yml").exists(), "nothing written");
+        assert!(
+            !s.0.join("my-team/agents/rinlead").exists(),
+            "nothing written"
+        );
+    }
+
+    #[test]
+    fn init_refuses_names_the_schema_rejects() {
+        let s = Scratch::new("names");
+        let outside = s.0.join("outside");
+        for name in ["Bad Name", "../outside", outside.to_str().unwrap(), ""] {
+            let e = init_project(Some(name.into()), s.0.join("dir")).unwrap_err();
+            assert!(format!("{e:#}").contains("/name"), "{name}: {e:#}");
+        }
+        assert!(!s.0.join("dir").exists() && !outside.exists());
     }
 
     #[test]

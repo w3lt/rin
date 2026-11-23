@@ -97,12 +97,13 @@ enum HostCmd {
     Completions {
         shell: Shell,
     },
-    /// Init new Rin project
+    /// Write a starter project (rin.yml and agents/<id>/INSTRUCTIONS.md) to DIR/NAME.
     Init {
-        /// Directory where the configuration will be initialized
+        /// Folder to create the project folder in.
         #[arg(short = 'd', long = "dir", default_value = ".", value_name = "DIR")]
         directory: PathBuf,
 
+        /// Team name, also the project folder's name [default: rinteam]
         name: Option<String>,
     },
     /// Validate rin.yml and write the team's folder in $RIN_HOME; makes it the current team.
