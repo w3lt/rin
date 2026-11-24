@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
-# Open SonarCloud issues and security hotspots on a pull request, read from the
-# project's public API (no token needed)
+# Open SonarCloud issues on a pull request's head commit, from the public API
 #
 # scripts/sonar_issues.sh        the current branch's pull request
 # scripts/sonar_issues.sh 12     pull request #12
 #
-# Waits until SonarCloud has analysed the pull request's head commit, then prints
-# one tab-separated line per finding: severity, rule, file:line, message.
-# Exit 0: nothing open, 1: findings to triage, 2: error or timeout.
+# Exit 0: nothing open, 1: issues to triage, 2: error or timeout.
 #
 # HAPPY HACKING!
 
@@ -61,25 +58,20 @@ done
 
 issues="$(get "issues/search?componentKeys=$project&pullRequest=$pr&resolved=false&ps=500")" ||
     die "cannot read issues of #$pr"
-hotspots="$(get "hotspots/search?projectKey=$project&pullRequest=$pr&status=TO_REVIEW&ps=500")" ||
-    die "cannot read security hotspots of #$pr"
 
 n_issues="$(jq -r .total <<<"$issues")"
-n_hotspots="$(jq -r .paging.total <<<"$hotspots")"
 
-echo "#$pr at ${head:0:7}: $n_issues open issue(s), $n_hotspots hotspot(s) to review"
+echo "#$pr at ${head:0:7}: $n_issues open issue(s)"
 echo "https://sonarcloud.io/project/issues?id=$project&pullRequest=$pr&resolved=false"
 
 jq -r --arg p "$project:" '.issues[]
     | [.severity, .rule, "\(.component | ltrimstr($p)):\(.line // 0)", .message] | @tsv' <<<"$issues"
-jq -r --arg p "$project:" '.hotspots[]
-    | ["HOTSPOT-\(.vulnerabilityProbability)", .ruleKey, "\(.component | ltrimstr($p)):\(.line // 0)", .message] | @tsv' <<<"$hotspots"
 
-if [[ "$n_issues" -gt 500 || "$n_hotspots" -gt 500 ]]; then
-    echo "only the first 500 of each are listed; see the link above" >&2
+if [[ "$n_issues" -gt 500 ]]; then
+    echo "only the first 500 are listed; see the link above" >&2
 fi
 
-if [[ "$n_issues" -eq 0 && "$n_hotspots" -eq 0 ]]; then
+if [[ "$n_issues" -eq 0 ]]; then
     exit 0
 fi
 exit 1

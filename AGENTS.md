@@ -9,9 +9,10 @@
 - `scripts/inspect_environment.sh`: checks this machine's development environment: git, hooks, the Rust
   toolchain (rustc ≥ 1.89, fmt, clippy), Docker and Compose (≥ 5.6). Run it when a check fails for reasons
   unrelated to the change, and before `scripts/verify_docker.sh` to see whether Docker is usable here.
-- `scripts/sonar_issues.sh [pr]`: waits for SonarCloud's analysis of a pull request's head commit and lists its
-  open issues and security hotspots from the public API (no token). The quality gate passes with open issues,
-  so read this rather than the check.
+- `scripts/pr_checks.sh [pr]`: waits for every status check on a pull request's head commit, then lists each
+  check and the findings it annotated on the code. A passing check can still report findings.
+- `scripts/sonar_issues.sh [pr]`: the SonarCloud check's open issues on a pull request, with rule keys, from the
+  public API (no token). Its quality gate passes with open issues.
 - One test: `cargo test --all-features <name>`. Plain `cargo test` skips the
   end-to-end tests in `src/tests.rs`, which need all three features.
 - Git hooks live in `.githooks/`; enable them once per clone with `git config core.hooksPath .githooks`.
@@ -39,7 +40,7 @@
 - Do not break existing public interfaces without justification.
 - Preserve persistent user data during generation, cleanup, and lifecycle changes.
 - Before calling a non-trivial change done, run the `review-loop` skill: verify, independent review, fix, repeat.
-- Open or push to a pull request through the `pr` skill: conventions, then SonarCloud findings after every push.
+- Open or push to a pull request through the `pr` skill: conventions, then status checks after every push.
 
 ## Commits
 
