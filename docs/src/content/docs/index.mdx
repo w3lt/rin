@@ -1,0 +1,44 @@
+---
+title: Rin
+description: Run a team of AI agents on your own machine. One config file, one command, one Docker container per agent.
+template: splash
+hero:
+  title: A whole team of AI agents, on your machine
+  tagline: Describe your team in one file. Rin gives every agent its own container, a leader to split up the work, and a way to message each other.
+  image:
+    file: ../../assets/team.svg
+    alt: You talk to rin, the leader. rin delegates to backend, frontend and devops, then reviews their work. The agents message each other, and you can talk to any of them directly. Every agent lives in its own Docker container.
+  actions:
+    - text: Quickstart
+      link: /start/quickstart/
+      icon: right-arrow
+    - text: What is Rin?
+      link: /start/introduction/
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+	<Card title="A room for everyone" icon="laptop">
+		Each agent runs in its own Docker container and keeps its home between restarts.
+	</Card>
+	<Card title="Any brain you like" icon="puzzle">
+		Each agent runs Claude Code, Codex, Antigravity or pi. Mix them in one team.
+	</Card>
+	<Card title="One leads, everyone talks" icon="comment">
+		A leader splits up the work and hands it out. Agents message each other, and you can talk to any of them.
+	</Card>
+	<Card title="Same team, every time" icon="seti:config">
+		The same `rin.yml` brings back the same team, on any machine.
+	</Card>
+</CardGrid>
+
+## Where to go next
+
+<CardGrid>
+	<LinkCard title="Install Rin" href="/start/installation/" description="Homebrew or cargo, plus Docker." />
+	<LinkCard title="Design your team" href="/guides/team/" description="Agents, roles, harnesses and instructions." />
+	<LinkCard title="CLI reference" href="/reference/cli/" description="Every command and flag." />
+	<LinkCard title="rin.yml reference" href="/reference/config/" description="Every field, its default and its limits." />
+</CardGrid>
