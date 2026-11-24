@@ -5,7 +5,6 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { unescape } from "node:querystring";
 
 const BASE = "/";
 const dist = process.argv[2];
