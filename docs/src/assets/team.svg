@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 470" role="img" aria-labelledby="title desc">
+  <title id="title">How a Rin team fits together</title>
+  <desc id="desc">You talk to rin, the leader. rin delegates to the backend, frontend and devops agents and reviews their work. The agents can message each other, and you can also talk to any of them directly. Each agent lives in its own Docker container.</desc>
+
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1d0711"/>
+      <stop offset=".5" stop-color="#2c0a19"/>
+      <stop offset="1" stop-color="#0b0b1f"/>
+    </linearGradient>
+    <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffd6a0" stop-opacity=".7"/>
+      <stop offset=".5" stop-color="#ff4d6d" stop-opacity=".25"/>
+      <stop offset="1" stop-color="#ffd6a0" stop-opacity=".7"/>
+    </linearGradient>
+    <linearGradient id="leader" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5a1024"/>
+      <stop offset="1" stop-color="#3a0b1a"/>
+    </linearGradient>
+    <filter id="bloom" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+    <marker id="tip" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9z" fill="#ff8fa3"/>
+    </marker>
+    <marker id="tip-dim" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9z" fill="#b88792"/>
+    </marker>
+  </defs>
+
+  <style>
+    text { font-family: -apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif; text-anchor: middle; }
+    .name { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-weight: 700; fill: #ffffff; }
+    .role { fill: #ffc2cd; }
+    .runs { fill: #1d0711; font-weight: 700; font-size: 14.5px; }
+    .note { fill: #d9a9b3; font-size: 17px; font-style: italic; }
+    .link { fill: none; stroke: #ff8fa3; stroke-width: 2; }
+    .link.dim { stroke: #b88792; stroke-width: 1.5; stroke-dasharray: 5 7; }
+    .box { fill: #2a0d1c; stroke: #c94a66; stroke-width: 1.5; }
+  </style>
+
+  <rect width="1280" height="470" rx="28" fill="url(#night)"/>
+  <rect x="11" y="11" width="1258" height="448" rx="19" fill="none" stroke="url(#frame)" stroke-width="1.2"/>
+
+  <!-- you can also talk to anyone directly -->
+  <path class="link dim" marker-end="url(#tip-dim)" d="M150,166 C210,40 620,40 822,80"/>
+  <path class="link dim" marker-end="url(#tip-dim)" d="M150,294 C210,420 620,420 822,380"/>
+  <text class="note" x="470" y="42">…or talk to any of them directly</text>
+
+  <!-- you <-> rin -->
+  <path class="link" marker-start="url(#tip)" marker-end="url(#tip)" d="M218,230 H362"/>
+  <text class="note" x="290" y="216">ask</text>
+
+  <!-- rin <-> members -->
+  <path class="link" marker-start="url(#tip)" marker-end="url(#tip)" d="M640,142 C640,112 700,112 822,112"/>
+  <path class="link" marker-start="url(#tip)" marker-end="url(#tip)" d="M680,230 H822"/>
+  <path class="link" marker-start="url(#tip)" marker-end="url(#tip)" d="M640,318 C640,348 700,348 822,348"/>
+  <text class="note" x="751" y="194">delegates,</text>
+  <text class="note" x="751" y="214">then reviews</text>
+
+  <!-- members <-> each other -->
+  <path class="link" marker-start="url(#tip)" marker-end="url(#tip)" d="M1068,98 C1118,98 1118,362 1068,362"/>
+  <path class="link" marker-end="url(#tip)" d="M1105,230 H1070"/>
+  <text class="note" x="1120" y="226" style="text-anchor: start">they message</text>
+  <text class="note" x="1120" y="248" style="text-anchor: start">each other too</text>
+
+  <!-- you -->
+  <circle cx="150" cy="230" r="60" class="box"/>
+  <text x="150" y="228" font-size="26" font-weight="700" fill="#ffffff">You</text>
+  <text x="150" y="252" font-size="14" class="role">your terminal</text>
+
+  <!-- rin, the leader -->
+  <rect x="380" y="150" width="290" height="160" rx="22" fill="#ff2d55" opacity=".45" filter="url(#bloom)"/>
+  <rect x="370" y="150" width="300" height="160" rx="22" fill="url(#leader)" stroke="#ff5c7a" stroke-width="2"/>
+  <g transform="translate(520 150)">
+    <polygon points="-9,-12 9,-12 16,-3 0,18 -16,-3" fill="#ff4d6d" stroke="#ffd0d8" stroke-width=".8"/>
+    <polygon points="-9,-12 9,-12 5,-3 -5,-3" fill="#ffb3c0"/>
+  </g>
+  <text x="520" y="212" font-size="38" class="name">rin</text>
+  <text x="520" y="242" font-size="18" class="role">leader · Chief Architect</text>
+  <rect x="455" y="259" width="130" height="28" rx="14" fill="#ff8fa3"/>
+  <text x="520" y="278" class="runs">Claude Code</text>
+
+  <!-- backend -->
+  <rect x="830" y="48" width="230" height="100" rx="18" class="box"/>
+  <text x="945" y="88" font-size="26" class="name">backend</text>
+  <text x="945" y="110" font-size="16" class="role">Backend Engineer</text>
+  <rect x="897" y="118" width="96" height="24" rx="12" fill="#ff8fa3"/>
+  <text x="945" y="135" class="runs">Codex</text>
+
+  <!-- frontend -->
+  <rect x="830" y="180" width="230" height="100" rx="18" class="box"/>
+  <text x="945" y="220" font-size="26" class="name">frontend</text>
+  <text x="945" y="242" font-size="16" class="role">Frontend Engineer</text>
+  <rect x="883" y="250" width="124" height="24" rx="12" fill="#ff8fa3"/>
+  <text x="945" y="267" class="runs">Antigravity</text>
+
+  <!-- devops -->
+  <rect x="830" y="312" width="230" height="100" rx="18" class="box"/>
+  <text x="945" y="352" font-size="26" class="name">devops</text>
+  <text x="945" y="374" font-size="16" class="role">DevOps Engineer</text>
+  <rect x="910" y="382" width="70" height="24" rx="12" fill="#ff8fa3"/>
+  <text x="945" y="399" class="runs">pi</text>
+
+  <text x="640" y="444" font-size="15" font-weight="600" letter-spacing="3" fill="#b88792">EVERY AGENT LIVES IN ITS OWN DOCKER CONTAINER</text>
+</svg>

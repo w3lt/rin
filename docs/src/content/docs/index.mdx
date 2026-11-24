@@ -1,40 +1,44 @@
 ---
-title: Welcome to Starlight
-description: Get started building your docs site with Starlight.
-template: splash # Remove or comment out this line to display the site sidebar on this page.
+title: Rin
+description: Run a team of AI agents on your own machine. One config file, one command, one Docker container per agent.
+template: splash
 hero:
-  tagline: Congrats on setting up a new Starlight project!
+  title: A whole team of AI agents, on your machine
+  tagline: Describe your team in one file. Rin gives every agent its own container, a leader to split up the work, and a way to message each other.
   image:
-    file: ../../assets/houston.webp
+    file: ../../assets/team.svg
+    alt: You talk to rin, the leader. rin delegates to backend, frontend and devops, then reviews their work. The agents message each other, and you can talk to any of them directly. Every agent lives in its own Docker container.
   actions:
-    - text: Example Guide
-      link: /guides/example/
+    - text: Quickstart
+      link: /rin/start/quickstart/
       icon: right-arrow
-    - text: Read the Starlight docs
-      link: https://starlight.astro.build
-      icon: external
+    - text: What is Rin?
+      link: /rin/start/introduction/
       variant: minimal
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
-
-## Next steps
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 <CardGrid stagger>
-	<Card title="Update content" icon="pencil">
-		Edit `src/content/docs/index.mdx` to see this page change.
+	<Card title="A room for everyone" icon="laptop">
+		Each agent runs in its own Docker container and keeps its home between restarts.
 	</Card>
-	<Card title="Change page layout" icon="document">
-		Delete `template: splash` in `src/content/docs/index.mdx` to display a
-		sidebar on this page.
+	<Card title="Any brain you like" icon="puzzle">
+		Each agent runs Claude Code, Codex, Antigravity or pi. Mix them in one team.
 	</Card>
-	<Card title="Add new content" icon="add-document">
-		Add Markdown or MDX files to `src/content/docs` to create new pages.
+	<Card title="One leads, everyone talks" icon="comment">
+		A leader splits up the work and hands it out. Agents message each other, and you can talk to any of them.
 	</Card>
-	<Card title="Configure your site" icon="setting">
-		Edit your `sidebar` and other config in `astro.config.mjs`.
+	<Card title="Same team, every time" icon="seti:config">
+		The same `rin.yml` brings back the same team, on any machine.
 	</Card>
-	<Card title="Read the docs" icon="open-book">
-		Learn more in [the Starlight Docs](https://starlight.astro.build/).
-	</Card>
+</CardGrid>
+
+## Where to go next
+
+<CardGrid>
+	<LinkCard title="Install Rin" href="/rin/start/installation/" description="Homebrew or cargo, plus Docker." />
+	<LinkCard title="Design your team" href="/rin/guides/team/" description="Agents, roles, harnesses and instructions." />
+	<LinkCard title="CLI reference" href="/rin/reference/cli/" description="Every command and flag." />
+	<LinkCard title="rin.yml reference" href="/rin/reference/config/" description="Every field, its default and its limits." />
 </CardGrid>

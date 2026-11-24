@@ -1,49 +1,44 @@
-# Starlight Starter Kit: Basics
+# Rin documentation
 
-[![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
+The user documentation for Rin, built with [Starlight](https://starlight.astro.build) and
+published to <https://w3lt.github.io/rin/> from `main`.
 
-```
-pnpm create astro@latest -- --template starlight
-```
-
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
-
-## 🚀 Project Structure
-
-Inside of your Astro + Starlight project, you'll see the following folders and files:
-
-```
-.
-├── public/
-├── src/
-│   ├── assets/
-│   ├── content/
-│   │   └── docs/
-│   └── content.config.ts
-├── astro.config.mjs
-├── package.json
-└── tsconfig.json
+```sh
+pnpm install
+pnpm dev       # http://localhost:4321/rin/
+pnpm build     # the site, in dist/
+pnpm preview   # serve dist/
 ```
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
+## Layout
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+Pages are Markdown in `src/content/docs/`; the URL follows the path. The sidebar is listed by
+hand in `astro.config.mjs`, so add a new page there too.
 
-Static assets, like favicons, can be placed in the `public/` directory.
+| Directory     | For                                                   |
+| :------------ | :---------------------------------------------------- |
+| `start/`      | First contact: what Rin is, installing, a first team  |
+| `guides/`     | Doing one thing: a task from start to finish          |
+| `concepts/`   | How Rin works, for readers who want the model         |
+| `reference/`  | Complete and exact: every command, field and file     |
 
-## 🧞 Commands
+## Conventions
 
-All commands are run from the root of the project, from a terminal:
+- **Links between pages include the base path**: `/rin/guides/team/`, not `/guides/team/`.
+  Starlight adds it to the sidebar only.
+- **The code is the source of truth.** Commands and flags come from `src/main.rs` and
+  `src/host_cli.rs`, `rin.yml` fields and defaults from `rin-schema.json` and
+  `src/shared/config.rs`, error messages from where they are raised. Quote error messages
+  exactly, so readers can search for them.
+- When a change to Rin changes a command, flag, field, default or message, update these pages
+  in the same pull request.
+- **Examples pin the current version** (`version: 0.1.2` and the `refs/tags/v0.1.2` schema
+  URL), because `rin generate` refuses any other. Update them on every release:
+  `grep -rn '0\.1\.2' src/content/docs`.
+- Plain words, short sentences, present tense. Address the reader as "you".
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `pnpm install`             | Installs dependencies                            |
-| `pnpm dev`             | Starts local dev server at `localhost:4321`      |
-| `pnpm build`           | Build your production site to `./dist/`          |
-| `pnpm preview`         | Preview your build locally, before deploying     |
-| `pnpm astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `pnpm astro -- --help` | Get help using the Astro CLI                     |
+## Publishing
 
-## 👀 Want to learn more?
-
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+`.github/workflows/docs.yml` builds the site on every pull request that touches `docs/`, so a
+broken page fails the check before it is merged, and on `main` builds it the same way and
+deploys it to GitHub Pages.
