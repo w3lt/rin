@@ -4,12 +4,7 @@
   "description": "Declarative configuration for a cluster of Rin swarm agent. Rin Tohsaka is the best waifu btw",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "rin",
-    "name",
-    "agents",
-    "version"
-  ],
+  "required": ["rin", "name", "agents", "llmProviders", "version"],
   "properties": {
     "rin": {
       "type": "string",
@@ -49,9 +44,7 @@
       },
       "contains": {
         "type": "object",
-        "required": [
-          "type"
-        ],
+        "required": ["type"],
         "properties": {
           "type": {
             "const": "leader"
@@ -60,6 +53,12 @@
       },
       "minContains": 1,
       "maxContains": 1
+    },
+    "llmProviders": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/agent"
+      }
     }
   },
   "$defs": {
@@ -77,22 +76,13 @@
       ],
       "properties": {
         "id": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9-]{0,30}$",
+          "$ref": "#/$defs/id",
           "not": {
-            "enum": [
-              "user",
-              "hub",
-              "bifrost",
-              "localhost"
-            ]
+            "enum": ["user", "hub", "bifrost", "localhost"]
           }
         },
         "type": {
-          "enum": [
-            "leader",
-            "member"
-          ]
+          "enum": ["leader", "member"]
         },
         "label": {
           "type": "string",
@@ -102,18 +92,10 @@
           "$ref": "#/$defs/resources"
         },
         "harness": {
-          "enum": [
-            "claude-code",
-            "codex",
-            "antigravity",
-            "pi"
-          ]
+          "enum": ["claude-code", "codex", "antigravity", "pi"]
         },
         "authentication": {
-          "enum": [
-            "subscription",
-            "apiKey"
-          ]
+          "enum": ["subscription", "apiKey"]
         },
         "model": {
           "type": "string"
@@ -130,9 +112,7 @@
             "const": "pi"
           }
         },
-        "required": [
-          "harness"
-        ]
+        "required": ["harness"]
       },
       "then": {
         "properties": {
@@ -140,18 +120,38 @@
             "const": "apiKey"
           }
         },
-        "required": [
-          "authentication"
-        ]
+        "required": ["authentication"]
+      }
+    },
+    "llmProvider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "baseUrl", "apiKeyRequired"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "not": {
+            "enum": ["openai", "anthropic", "google", "ollama"]
+          }
+        },
+        "type": {
+          "enum": ["openai"]
+        },
+        "baseUrl": {
+          "type": "string"
+        },
+        "apiKeyRequired": {
+          "type": "boolean"
+        },
+        "apiKeyEnv": {
+          "type": "string"
+        }
       }
     },
     "resources": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "cpus",
-        "ram"
-      ],
+      "required": ["cpus", "ram"],
       "properties": {
         "cpus": {
           "type": "number",
@@ -164,6 +164,10 @@
           "description": "Memory limit for the agent's container (Compose mem_limit), e.g. 512m or 4g"
         }
       }
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,30}$"
     }
   }
 }
