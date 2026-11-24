@@ -6,7 +6,7 @@
 
 use crate::rin_bail;
 use crate::rinerrln;
-use crate::shared::config::Harness;
+use crate::shared::config::{Harness, custom_provider_name, split_model};
 use anyhow::{Context, Result};
 use serde_json::{Map, Value, json};
 use std::fs;
@@ -64,13 +64,13 @@ pub fn apply(home: &Path, settings: &Settings) -> Result<Vec<PathBuf>> {
             }
         }
         Harness::Pi => {
-            let (provider, model) = match settings.model.split_once('/') {
-                Some((provider, model)) => (Some(provider), model),
-                None => (None, settings.model),
-            };
+            let provider = split_model(settings.model).map(|(provider, _)| provider);
+            let pi = PiModel::of(settings.model);
+            let added = pi.added.then_some(pi.provider.as_deref()).flatten();
+            let pi_model = &pi.id;
             json(home.join(".pi/agent/settings.json"), &|s| {
-                s.insert("defaultModel".into(), json!(model));
-                if let Some(provider) = provider {
+                s.insert("defaultModel".into(), json!(pi.id));
+                if let Some(provider) = &pi.provider {
                     s.insert("defaultProvider".into(), json!(provider));
                 }
             })?;
@@ -81,14 +81,27 @@ pub fn apply(home: &Path, settings: &Settings) -> Result<Vec<PathBuf>> {
                     Some("google") => Some(("google", format!("{bifrost}/genai"))),
                     _ => None,
                 };
-                match route {
-                    Some((provider, url)) => json(home.join(".pi/agent/models.json"), &|s| {
-                        object(object(s, "providers"), provider)
-                            .insert("baseUrl".into(), json!(url));
+                match (added, route) {
+                    (Some(name), _) => json(home.join(".pi/agent/models.json"), &|s| {
+                        let entry = object(object(s, "providers"), name);
+                        entry.insert("baseUrl".into(), json!(format!("{bifrost}/openai/v1")));
+                        entry.insert("api".into(), json!("openai-completions"));
+                        // The name of the variable holding the agent's virtual key.
+                        entry.insert("apiKey".into(), json!("OPENAI_API_KEY"));
+                        let models = array(entry, "models");
+                        if !models.iter().any(|m| m.get("id") == Some(&json!(pi_model))) {
+                            models.push(json!({ "id": pi_model }));
+                        }
                     })?,
+                    (None, Some((provider, url))) => {
+                        json(home.join(".pi/agent/models.json"), &|s| {
+                            object(object(s, "providers"), provider)
+                                .insert("baseUrl".into(), json!(url));
+                        })?
+                    }
                     // Without a route pi would send its Bifrost key straight to the provider.
-                    None => rinerrln!(
-                        "runtime: pi model {:?} can't be routed through Bifrost: write it as anthropic/<model>, openai/<model> or google/<model>",
+                    (None, None) => rinerrln!(
+                        "runtime: pi model {:?} can't be routed through Bifrost: write it as <provider>/<model>",
                         settings.model
                     ),
                 }
@@ -115,6 +128,55 @@ pub fn apply(home: &Path, settings: &Settings) -> Result<Vec<PathBuf>> {
     Ok(written)
 }
 
+/// A `rin.yml` pi model as pi knows it.
+pub struct PiModel {
+    pub provider: Option<String>,
+    pub id: String,
+    /// A provider Rin adds to pi (Ollama or a custom one), rather than one of pi's own.
+    pub added: bool,
+}
+
+impl PiModel {
+    /// pi's own providers keep their models and only get Bifrost's URL. Ollama
+    /// and custom providers become pi providers of their own, speaking chat
+    /// completions to Bifrost, which wants `<its name>/<model>` as the model id.
+    pub fn of(model: &str) -> PiModel {
+        let Some((provider, name)) = split_model(model) else {
+            return PiModel {
+                provider: None,
+                id: model.to_string(),
+                added: false,
+            };
+        };
+        let added = match provider {
+            "anthropic" | "openai" | "google" => None,
+            "ollama" => Some("ollama".to_string()),
+            id => Some(custom_provider_name(id)),
+        };
+        match added {
+            Some(pi_provider) => PiModel {
+                id: format!("{pi_provider}/{name}"),
+                provider: Some(pi_provider),
+                added: true,
+            },
+            None => PiModel {
+                provider: Some(provider.to_string()),
+                id: name.to_string(),
+                added: false,
+            },
+        }
+    }
+
+    /// What `pi --model` takes: `<provider>/<id>`, so an id with a `/` in it
+    /// still names this provider's model.
+    pub fn cli(&self) -> String {
+        match &self.provider {
+            Some(provider) => format!("{provider}/{}", self.id),
+            None => self.id.clone(),
+        }
+    }
+}
+
 /// The object at `key`, made one if missing or not an object.
 fn object<'a>(map: &'a mut Map<String, Value>, key: &str) -> &'a mut Map<String, Value> {
     let slot = map.entry(key.to_string()).or_insert_with(|| json!({}));
@@ -122,6 +184,15 @@ fn object<'a>(map: &'a mut Map<String, Value>, key: &str) -> &'a mut Map<String,
         *slot = json!({});
     }
     slot.as_object_mut().expect("just made an object")
+}
+
+/// The array at `key`, made one if missing or not an array.
+fn array<'a>(map: &'a mut Map<String, Value>, key: &str) -> &'a mut Vec<Value> {
+    let slot = map.entry(key.to_string()).or_insert_with(|| json!([]));
+    if !slot.is_array() {
+        *slot = json!([]);
+    }
+    slot.as_array_mut().expect("just made an array")
 }
 
 /// Applies `edit` to the JSON object in `path` (created if missing); writes
@@ -341,6 +412,39 @@ mod tests {
             models["providers"]["anthropic"]["baseUrl"],
             "http://bifrost:8080/anthropic"
         );
+        // pi's own providers' models are named as written.
+        let cli = PiModel::of("anthropic/claude-sonnet-5-5").cli();
+        assert_eq!(cli, "anthropic/claude-sonnet-5-5");
+        assert_eq!(PiModel::of("bare").cli(), "bare");
+    }
+
+    #[test]
+    fn pi_adds_ollama_and_custom_providers_on_bifrost() {
+        for (model, name) in [
+            ("ollama/qwen3-coder:480b", "ollama"),
+            ("groq/openai/gpt-oss-120b", "rin-groq"),
+        ] {
+            let home = temp_home(name);
+            let s = settings(Harness::Pi, model, Some("http://bifrost:8080"));
+            apply(&home, &s).unwrap();
+            let pi_model = format!("{name}/{}", model.split_once('/').unwrap().1);
+            let config = read_json(home.join(".pi/agent/settings.json"));
+            assert_eq!(config["defaultProvider"], name);
+            assert_eq!(config["defaultModel"], pi_model.as_str());
+            let models = read_json(home.join(".pi/agent/models.json"));
+            let entry = &models["providers"][name];
+            assert_eq!(entry["baseUrl"], "http://bifrost:8080/openai/v1");
+            assert_eq!(entry["api"], "openai-completions");
+            assert_eq!(entry["apiKey"], "OPENAI_API_KEY");
+            assert_eq!(entry["models"], json!([{ "id": pi_model }]));
+            assert_eq!(PiModel::of(model).cli(), format!("{name}/{pi_model}"));
+
+            // Models you added are kept, and Rin's is not added twice.
+            let mut edited = models.clone();
+            edited["providers"][name]["models"] = json!([{ "id": "mine" }, { "id": pi_model }]);
+            fs::write(home.join(".pi/agent/models.json"), edited.to_string()).unwrap();
+            assert!(apply(&home, &s).unwrap().is_empty());
+        }
     }
 
     #[test]

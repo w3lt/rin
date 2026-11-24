@@ -4,7 +4,7 @@
   "description": "Declarative configuration for a cluster of Rin swarm agent. Rin Tohsaka is the best waifu btw",
   "type": "object",
   "additionalProperties": false,
-  "required": ["rin", "name", "agents", "llmProviders", "version"],
+  "required": ["rin", "name", "agents", "version"],
   "properties": {
     "rin": {
       "type": "string",
@@ -56,8 +56,9 @@
     },
     "llmProviders": {
       "type": "array",
+      "description": "Extra OpenAI-compatible providers for pi agents, besides the built-in openai, anthropic, google and ollama (Ollama Cloud). A pi agent uses one with model: <id>/<model>.",
       "items": {
-        "$ref": "#/$defs/agent"
+        "$ref": "#/$defs/llmProvider"
       }
     }
   },
@@ -130,21 +131,47 @@
       "properties": {
         "id": {
           "$ref": "#/$defs/id",
+          "description": "Unique; pi agents name it in model: <id>/<model>. openai, anthropic, google and ollama are built in.",
           "not": {
             "enum": ["openai", "anthropic", "google", "ollama"]
           }
         },
         "type": {
+          "description": "The API the provider speaks. openai: OpenAI chat completions.",
           "enum": ["openai"]
         },
         "baseUrl": {
-          "type": "string"
+          "type": "string",
+          "description": "The base URL an OpenAI client takes, usually ending in /v1: chat completions are at <baseUrl>/chat/completions. Reached from Bifrost's container: use host.docker.internal for a server on your machine.",
+          "pattern": "^https?://[^\\s/?#]+(/[^\\s?#]*)?$"
         },
         "apiKeyRequired": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Whether the provider needs an API key: usually true for cloud providers, false for local ones."
         },
         "apiKeyEnv": {
-          "type": "string"
+          "type": "string",
+          "description": "The variable in keys.env that holds the provider's API key. Required when apiKeyRequired is true, not allowed otherwise.",
+          "pattern": "^[A-Z_][A-Z0-9_]*$",
+          "not": {
+            "pattern": "^(BIFROST|RIN)_"
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "apiKeyRequired": {
+            "const": true
+          }
+        },
+        "required": ["apiKeyRequired"]
+      },
+      "then": {
+        "required": ["apiKeyEnv"]
+      },
+      "else": {
+        "not": {
+          "required": ["apiKeyEnv"]
         }
       }
     },

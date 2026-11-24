@@ -15,12 +15,19 @@ use crate::team::{self, Team, Tokens, read_tokens};
 
 pub const DOCKERFILE: &str = include_str!("../../images/Dockerfile");
 
-/// Provider keys Bifrost knows how to use, by `keys.env` variable.
-const PROVIDER_KEYS: [(&str, &str); 3] = [
-    ("ANTHROPIC_API_KEY", "anthropic"),
-    ("OPENAI_API_KEY", "openai"),
-    ("GEMINI_API_KEY", "gemini"),
+/// Built-in providers: Rin's id, Bifrost's name, and the `keys.env` variable.
+const BUILT_IN: [(&str, &str, &str); 4] = [
+    ("anthropic", "anthropic", "ANTHROPIC_API_KEY"),
+    ("openai", "openai", "OPENAI_API_KEY"),
+    ("google", "gemini", "GEMINI_API_KEY"),
+    ("ollama", "ollama", "OLLAMA_API_KEY"),
 ];
+
+/// Where Bifrost reaches the built-in `ollama`: Ollama Cloud.
+const OLLAMA_CLOUD_URL: &str = "https://ollama.com";
+
+/// Where an API-key agent finds its virtual key: every variable its harness may read.
+const AGENT_KEY_VARS: [&str; 3] = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY"];
 
 #[derive(Debug)]
 pub struct Generated {
@@ -78,20 +85,12 @@ pub fn generate(file: &Path, instructions: &Path, home: &Path, git_rev: &str) ->
     write_private(&team.tokens_file(), tokens_json.as_bytes())?;
 
     let virtual_keys = if config.uses_api_keys() {
-        let providers = provider_names(&keys_env);
-        let names = PROVIDER_KEYS.map(|(var, _)| var).join(", ");
-        if !keys_env.is_file() {
+        if let Some(problem) = missing_keys(&keys_env, &config) {
             warnings.push(format!(
-                "{} does not exist: create it with your provider keys ({names}), then run `rin generate` again; only Bifrost reads it",
-                keys_env.display()
-            ));
-        } else if providers.is_empty() {
-            warnings.push(format!(
-                "{} sets none of {names}: API-key agents will have no provider until you add one and run `rin generate` again",
-                keys_env.display()
+                "{problem}: add them, then run `rin generate` again (only Bifrost reads them)"
             ));
         }
-        write_bifrost(&team, &config, &providers)?
+        write_bifrost(&team, &config, &defined_keys(&keys_env))?
     } else {
         BTreeMap::new()
     };
@@ -239,7 +238,7 @@ fn write_env_files(
     for agent in &config.agents {
         let mut text = format!("RIN_TOKEN={}\n", tokens[&agent.id]);
         if let Some(key) = virtual_keys.get(&agent.id) {
-            for var in PROVIDER_KEYS.map(|(var, _)| var) {
+            for var in AGENT_KEY_VARS {
                 text.push_str(&format!("{var}={key}\n"));
             }
         }
@@ -249,22 +248,101 @@ fn write_env_files(
     crate::files::set_mode(&dir, 0o700)
 }
 
-/// Which providers `keys.env` has keys for. Only the variable names are read.
-fn provider_names(keys_env: &Path) -> Vec<&'static str> {
+/// The variables `keys.env` sets to something. Only the names are read.
+fn defined_keys(keys_env: &Path) -> Vec<String> {
     let text = fs::read_to_string(keys_env).unwrap_or_default();
-    let defined: Vec<&str> = text
-        .lines()
+    text.lines()
         .map(str::trim)
         .filter(|l| !l.starts_with('#'))
         .filter_map(|l| l.trim_start_matches("export ").split_once('='))
-        .filter(|(_, value)| !value.trim().is_empty())
-        .map(|(name, _)| name.trim())
-        .collect();
-    PROVIDER_KEYS
-        .iter()
-        .filter(|(var, _)| defined.contains(var))
-        .map(|(_, p)| *p)
+        // `KEY=""` sets nothing either, to Compose.
+        .filter(|(_, value)| !matches!(value.trim(), "" | "\"\"" | "''"))
+        .map(|(name, _)| name.trim().to_string())
         .collect()
+}
+
+/// The `keys.env` variable a provider's key is in; `None` for a keyless custom provider.
+fn key_var<'a>(config: &'a Config, provider: &str) -> Option<&'a str> {
+    match BUILT_IN.iter().find(|(id, _, _)| *id == provider) {
+        Some((_, _, var)) => Some(var),
+        None => config.custom_provider(provider)?.api_key_env.as_deref(),
+    }
+}
+
+/// The keys the team's API-key agents need that `keys.env` doesn't set, as an
+/// error for you; `None` if nothing is missing. A team that only uses keyless
+/// providers needs no `keys.env` at all.
+pub fn missing_keys(keys_env: &Path, config: &Config) -> Option<String> {
+    let defined = defined_keys(keys_env);
+    let mut missing: Vec<&str> = config
+        .agents
+        .iter()
+        .filter_map(|a| key_var(config, a.provider()?))
+        .filter(|var| !defined.iter().any(|d| d == var))
+        .collect();
+    missing.sort();
+    missing.dedup();
+    if missing.is_empty() {
+        None
+    } else if keys_env.is_file() {
+        Some(format!(
+            "{} does not set {}",
+            keys_env.display(),
+            missing.join(", ")
+        ))
+    } else {
+        Some(format!(
+            "{} does not exist; your API-key agents need {}",
+            keys_env.display(),
+            missing.join(", ")
+        ))
+    }
+}
+
+/// Bifrost's `providers`: the built-in ones `keys.env` has a key for, and the
+/// custom ones that need none or have theirs.
+fn bifrost_providers(
+    config: &Config,
+    defined: &[String],
+) -> serde_json::Map<String, serde_json::Value> {
+    let has = |var: &str| defined.iter().any(|d| d == var);
+    let mut providers = serde_json::Map::new();
+    for (_, name, var) in BUILT_IN.iter().filter(|(_, _, var)| has(var)) {
+        let mut key =
+            json!({ "name": name, "value": format!("env.{var}"), "models": ["*"], "weight": 1.0 });
+        if *name == "ollama" {
+            key["ollama_key_config"] = json!({ "url": OLLAMA_CLOUD_URL });
+        }
+        providers.insert(name.to_string(), json!({ "keys": [key] }));
+    }
+    for provider in &config.llm_providers {
+        let name = provider.gateway_name();
+        let keys = match &provider.api_key_env {
+            Some(var) if has(var) => vec![
+                json!({ "name": name, "value": format!("env.{var}"), "models": ["*"], "weight": 1.0 }),
+            ],
+            Some(_) => continue,
+            None => vec![],
+        };
+        // `baseUrl` is what an OpenAI client takes (`…/v1`); Bifrost would add `/v1` again.
+        let chat = "/chat/completions";
+        providers.insert(
+            name,
+            json!({
+                "keys": keys,
+                // A server on your machine or network has a private address, which
+                // Bifrost refuses unless allowed; you chose this URL yourself.
+                "network_config": { "base_url": provider.base_url.trim_end_matches('/'), "allow_private_network": true },
+                "custom_provider_config": {
+                    "base_provider_type": "openai",
+                    "is_key_less": !provider.api_key_required,
+                    "allowed_requests": { "chat_completion": true, "chat_completion_stream": true },
+                    "request_path_overrides": { "chat_completion": chat, "chat_completion_stream": chat },
+                },
+            }),
+        );
+    }
+    providers
 }
 
 fn env_name(id: &str) -> String {
@@ -277,7 +355,7 @@ fn env_name(id: &str) -> String {
 fn write_bifrost(
     team: &Team,
     config: &Config,
-    providers: &[&str],
+    defined: &[String],
 ) -> Result<BTreeMap<String, String>> {
     let dir = team.dir.join("bifrost");
     let env_file = dir.join("bifrost.env");
@@ -320,14 +398,7 @@ fn write_bifrost(
         virtual_keys.insert(agent.id.clone(), key);
     }
 
-    let provider_config: serde_json::Map<String, serde_json::Value> = PROVIDER_KEYS
-        .iter()
-        .filter(|(_, provider)| providers.contains(provider))
-        .map(|(var, provider)| {
-            let key = json!({ "name": provider, "value": format!("env.{var}"), "models": ["*"], "weight": 1.0 });
-            (provider.to_string(), json!({ "keys": [key] }))
-        })
-        .collect();
+    let provider_config = bifrost_providers(config, defined);
     let bifrost_config = json!({
         "$schema": "https://www.getbifrost.ai/schema",
         "client": { "enforce_auth_on_inference": true },
@@ -754,6 +825,165 @@ mod tests {
         fs::remove_file(f.home().join("keys.env")).unwrap();
         let generated = f.generate().unwrap();
         assert_eq!(generated.warnings.len(), 1);
+    }
+
+    const PROVIDERS: &str = "
+llmProviders:
+  - id: groq
+    type: openai
+    baseUrl: https://api.groq.com/openai/v1/
+    apiKeyRequired: true
+    apiKeyEnv: GROQ_API_KEY
+  - id: local
+    type: openai
+    baseUrl: http://host.docker.internal:8000/v1
+    apiKeyRequired: false
+";
+
+    /// The fixture with custom providers, devops on `model` and `keys` as keys.env.
+    fn with_providers(name: &str, model: &str, keys: &str) -> Fixture {
+        let f = Fixture::new(name);
+        f.edit(
+            "model: anthropic/claude-sonnet-5-5",
+            &format!("model: {model}"),
+        );
+        let path = f.root.join("project/rin.yml");
+        let text = fs::read_to_string(&path).unwrap();
+        fs::write(&path, text + PROVIDERS).unwrap();
+        fs::write(f.home().join("keys.env"), keys).unwrap();
+        f
+    }
+
+    fn bifrost_providers(f: &Fixture) -> serde_json::Value {
+        let config: serde_json::Value =
+            serde_json::from_str(&f.read("bifrost/config.json")).unwrap();
+        config["providers"].clone()
+    }
+
+    #[test]
+    fn bifrost_gets_ollama_cloud_and_custom_providers() {
+        let f = with_providers(
+            "custom",
+            "groq/llama-4",
+            "GROQ_API_KEY=gsk-secret\nOLLAMA_API_KEY=ollama-secret\n",
+        );
+        let generated = f.generate().unwrap();
+        assert!(generated.warnings.is_empty(), "{:?}", generated.warnings);
+        let providers = bifrost_providers(&f);
+        assert_eq!(
+            providers.as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["ollama", "rin-groq", "rin-local"]
+        );
+        assert_eq!(
+            providers["ollama"]["keys"][0],
+            json!({ "name": "ollama", "value": "env.OLLAMA_API_KEY", "models": ["*"], "weight": 1.0,
+                    "ollama_key_config": { "url": "https://ollama.com" } })
+        );
+        let groq = &providers["rin-groq"];
+        assert_eq!(groq["keys"][0]["value"], "env.GROQ_API_KEY");
+        assert_eq!(
+            groq["network_config"]["base_url"],
+            "https://api.groq.com/openai/v1"
+        );
+        assert_eq!(
+            groq["custom_provider_config"]["base_provider_type"],
+            "openai"
+        );
+        assert_eq!(groq["custom_provider_config"]["is_key_less"], false);
+        assert_eq!(
+            groq["custom_provider_config"]["request_path_overrides"]["chat_completion"],
+            "/chat/completions"
+        );
+        assert_eq!(
+            groq["custom_provider_config"]["allowed_requests"],
+            json!({ "chat_completion": true, "chat_completion_stream": true })
+        );
+        let local = &providers["rin-local"];
+        assert_eq!(local["keys"], json!([]));
+        assert_eq!(local["custom_provider_config"]["is_key_less"], true);
+        assert_eq!(local["network_config"]["allow_private_network"], true);
+        for secret in ["gsk-secret", "ollama-secret"] {
+            assert!(!f.read("bifrost/config.json").contains(secret));
+            assert!(!f.read("docker-compose.yml").contains(secret));
+        }
+        assert!(
+            f.read("docker-compose.yml")
+                .contains("    extra_hosts:\n      - host.docker.internal:host-gateway\n")
+        );
+    }
+
+    #[test]
+    fn no_extra_hosts_without_custom_providers() {
+        let f = Fixture::new("no-extra-hosts");
+        f.generate().unwrap();
+        assert!(!f.read("docker-compose.yml").contains("extra_hosts"));
+    }
+
+    #[test]
+    fn keyless_providers_need_no_keys_env() {
+        let f = with_providers("keyless", "local/qwen3", "");
+        fs::remove_file(f.home().join("keys.env")).unwrap();
+        let generated = f.generate().unwrap();
+        assert!(generated.warnings.is_empty(), "{:?}", generated.warnings);
+        assert!(f.read("env/devops.env").contains("OPENAI_API_KEY=sk-bf-"));
+        assert_eq!(
+            bifrost_providers(&f)
+                .as_object()
+                .unwrap()
+                .keys()
+                .collect::<Vec<_>>(),
+            ["rin-local"]
+        );
+    }
+
+    #[test]
+    fn missing_keys_names_what_agents_need() {
+        let f = with_providers("missing", "groq/llama-4", "OLLAMA_API_KEY=x\n");
+        let generated = f.generate().unwrap();
+        let keys_env = f.home().join("keys.env");
+        let config =
+            config::from_yaml(&fs::read_to_string(f.root.join("project/rin.yml")).unwrap())
+                .unwrap();
+        let problem = missing_keys(&keys_env, &config).unwrap();
+        assert!(
+            problem.ends_with("keys.env does not set GROQ_API_KEY"),
+            "{problem}"
+        );
+        assert_eq!(generated.warnings.len(), 1);
+        assert!(
+            generated.warnings[0].starts_with(&problem),
+            "{:?}",
+            generated.warnings
+        );
+        // A provider without its key is left out of Bifrost.
+        assert!(bifrost_providers(&f).get("rin-groq").is_none());
+
+        // Subscription agents need no key; the API-key one names its provider's.
+        fs::remove_file(&keys_env).unwrap();
+        let problem = missing_keys(&keys_env, &config).unwrap();
+        assert!(
+            problem.ends_with("keys.env does not exist; your API-key agents need GROQ_API_KEY"),
+            "{problem}"
+        );
+        fs::write(&keys_env, "GROQ_API_KEY=\"\"\n").unwrap();
+        assert!(missing_keys(&keys_env, &config).is_some());
+        fs::write(&keys_env, "export GROQ_API_KEY=gsk\n").unwrap();
+        assert_eq!(missing_keys(&keys_env, &config), None);
+
+        // Every harness's key, each named once.
+        let mut config = config;
+        for agent in &mut config.agents {
+            agent.authentication = Authentication::ApiKey;
+        }
+        config.agents[3].model = "ollama/qwen3".into();
+        config.agents.push(config.agents[0].clone());
+        let problem = missing_keys(&keys_env, &config).unwrap();
+        assert!(
+            problem.ends_with(
+                "does not set ANTHROPIC_API_KEY, GEMINI_API_KEY, OLLAMA_API_KEY, OPENAI_API_KEY"
+            ),
+            "{problem}"
+        );
     }
 
     #[test]
