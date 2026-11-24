@@ -1,7 +1,7 @@
 ---
 name: Feature
 about: Propose a change to Rin
-labels: enhancement
+labels: feature
 ---
 
 ## Problem
