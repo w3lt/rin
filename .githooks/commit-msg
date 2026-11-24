@@ -13,7 +13,7 @@ case $subject in
     '' | 'Merge '* | 'Revert "'* | 'fixup! '* | 'squash! '* | 'amend! '*) exit 0 ;;
 esac
 
-types='build|chore|ci|docs|feat|fix|perf|refactor|release|revert|style|test|harness'
+types='build|chore|ci|docs|feat|fix|perf|refactor|release|revert|style|test|harness|docs'
 if ! printf '%s\n' "$subject" | grep -Eq "^($types)(\([^()[:space:]]+\))?!?: [^[:space:]]"; then
     cat >&2 <<EOF
 commit-msg: the subject must be "<type>[(scope)][!]: <description>".
