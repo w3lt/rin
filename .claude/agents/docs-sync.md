@@ -11,7 +11,8 @@ You check that Rin's docs match its code. You never edit anything.
 ## Sources of truth
 
 - CLI: `src/main.rs` (commands, flags, help text) and `src/host_cli.rs`.
-- Team config: `src/config.rs` (fields, defaults) and `rin-schema.json` (embedded; the tests validate examples against it).
+- Team config: `src/shared/config.rs` (fields, defaults) and `rin-schema.json` (embedded; the tests validate examples against it).
+- Behaviour and messages: `src/host_cli/generate.rs`, `src/compose.rs`, `src/hub.rs`, `src/agent_runtime.rs`.
 - Version: `version` in `Cargo.toml`.
 
 ## Check against
@@ -20,7 +21,10 @@ You check that Rin's docs match its code. You never edit anything.
   example YAML, the "Working on Rin itself" section.
 - `examples/team/rin.yml` and `examples/team/agents/*/INSTRUCTIONS.md`.
 - `rin-schema.json` descriptions and defaults versus `src/config.rs`.
-- `AGENTS.md` commands versus `scripts/verify_code.sh`.
+- The docs site, `docs/src/content/docs/**`: commands and flags (`reference/cli.md`), `rin.yml`
+  fields and defaults (`reference/config.md`), quoted error messages (`guides/troubleshooting.md`),
+  and the pinned version in examples.
+- `AGENTS.md` commands versus `scripts/verify_code.sh` and `scripts/verify_docs.sh`.
 
 Start from what changed: `git diff main...HEAD --stat`, `git diff HEAD --stat` and untracked files in `git status --short`.
 Check only what those changes could make stale, unless the caller asks for a full sweep.

@@ -8,7 +8,7 @@ repository = "https://github.com/w3lt/rin"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 keywords = ["rin-tohsaka", "cli", "ai-agent", "swarm"]
-exclude = ["/assets"]
+exclude = ["/assets", "/docs"]
 
 [[bin]]
 name = "rin"
