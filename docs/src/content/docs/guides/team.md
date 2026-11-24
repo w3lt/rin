@@ -42,7 +42,7 @@ The first line points your editor at the schema for this Rin version, so editors
 YAML language server (VS Code with the YAML extension, for example) complete and check the
 file as you type. `rin init` writes it for you.
 
-Every field is described in the [rin.yml reference](/rin/reference/config/).
+Every field is described in the [rin.yml reference](/reference/config/).
 
 ## Leader and members
 
@@ -55,7 +55,7 @@ and that they may ask teammates for what they need.
 
 ## Choosing a harness
 
-Each agent runs one [harness](/rin/reference/harnesses/):
+Each agent runs one [harness](/reference/harnesses/):
 
 | `harness`     | Tool         | Messages teammates with      | `authentication`         |
 | :------------ | :----------- | :--------------------------- | :----------------------- |
@@ -66,7 +66,7 @@ Each agent runs one [harness](/rin/reference/harnesses/):
 
 `model` is passed to the harness as is, so use the name that harness expects. pi with an API
 key needs a provider prefix: `anthropic/…`, `openai/…` or `google/…`. See
-[Subscriptions and API keys](/rin/guides/authentication/).
+[Subscriptions and API keys](/guides/authentication/).
 
 ## Writing instructions
 
@@ -107,7 +107,7 @@ Three numbers shape how busy the team can get:
 - **`messaging.maxHops`** (default 5): how long a chain of messages may get. Your message is
   hop 1; a message an agent sends while working on it is hop 2, and so on.
 
-[Talking to agents](/rin/guides/messaging/) explains how they interact.
+[Talking to agents](/guides/messaging/) explains how they interact.
 
 ## Resources
 

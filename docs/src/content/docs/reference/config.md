@@ -70,7 +70,7 @@ version's tag, so everyone using the config gets the same team.
 **`timeout`** is how long one message may take from the moment it is sent, waiting in a
 queue included. **`maxHops`** is the longest chain of messages allowed: your message is
 hop 1, a message sent while handling it hop 2. See
-[Talking to agents](/rin/guides/messaging/).
+[Talking to agents](/guides/messaging/).
 
 ## `agents`
 
@@ -105,14 +105,14 @@ line of every message the agent sends, so the receiver knows who is asking.
 
 ### `harness`
 
-The coding-agent tool the agent runs. See [Harnesses](/rin/reference/harnesses/).
+The coding-agent tool the agent runs. See [Harnesses](/reference/harnesses/).
 
 ### `authentication`
 
 - `subscription`: the agent uses its tool's own account; sign it in once with `rin shell`.
 - `apiKey`: the agent uses a provider key from `~/.rin/keys.env`, through Bifrost.
 
-`harness: pi` requires `apiKey`. See [Subscriptions and API keys](/rin/guides/authentication/).
+`harness: pi` requires `apiKey`. See [Subscriptions and API keys](/guides/authentication/).
 
 ### `model`
 

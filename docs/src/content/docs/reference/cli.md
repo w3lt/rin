@@ -30,7 +30,7 @@ Act on this team instead of the current one. `NAME` is the team's `name` from it
 `rin.yml`; the team must have been generated. `init`, `generate`, `use` and `completions` ignore it.
 
 Every command that acts on a team uses the current team unless `--team` is given, so it
-works from any directory. See [Running several teams](/rin/guides/teams/).
+works from any directory. See [Running several teams](/guides/teams/).
 
 On failure, commands print the error and exit with status 1.
 
@@ -68,7 +68,7 @@ Checks the config and the instructions, then writes the team's directory to
 
 It refuses, and writes nothing, when:
 
-- the config breaks the [schema](/rin/reference/config/), or has a duplicate agent id;
+- the config breaks the [schema](/reference/config/), or has a duplicate agent id;
 - its `version` is not this `rin`'s version;
 - an agent has no `INSTRUCTIONS.md`, or a directory in `<DIR>` is no agent;
 - the team's Docker names would clash with another generated team's.
@@ -76,10 +76,10 @@ It refuses, and writes nothing, when:
 It warns when the team has API-key agents and `keys.env` is missing or has no known key.
 
 Running it again with nothing changed changes nothing. Tokens and Bifrost virtual keys are
-kept; delete `tokens.json` first to [rotate tokens](/rin/guides/lifecycle/#rotate-tokens).
+kept; delete `tokens.json` first to [rotate tokens](/guides/lifecycle/#rotate-tokens).
 Changes reach a running team with `rin up`.
 
-Set [`RIN_GIT_REV`](/rin/reference/files/#environment) to build the images from another
+Set [`RIN_GIT_REV`](/reference/files/#environment) to build the images from another
 Rin revision.
 
 ## rin use
@@ -138,7 +138,7 @@ Sends a message to agent `<ID>`, waits for its final answer and prints it. The w
 From your machine, the message comes from you (`user`) as hop 1. Inside an agent's container
 (a pi agent's tool call, or your `rin shell`), it comes from that agent, and inside a session
 one hop further than the message that started it. See
-[Talking to agents](/rin/guides/messaging/).
+[Talking to agents](/guides/messaging/).
 
 It waits up to the team's `messaging.timeout`. Messages are limited to 120 KiB.
 
@@ -205,4 +205,4 @@ rin completions <SHELL>
 ```
 
 Prints the completion script for `bash`, `zsh`, `fish`, `elvish` or `powershell`.
-See [Installation](/rin/start/installation/#shell-completions).
+See [Installation](/start/installation/#shell-completions).

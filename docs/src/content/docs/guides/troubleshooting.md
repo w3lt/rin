@@ -25,13 +25,13 @@ No team has been generated yet on this machine (or in this `RIN_HOME`).
 
 **`` version 0.1.1 does not match this rin (0.1.2); install rin 0.1.1 or change `version:` ``**\
 The file was written for another Rin version. Install that version, or
-[upgrade the team](/rin/guides/lifecycle/#upgrade-rin).
+[upgrade the team](/guides/lifecycle/#upgrade-rin).
 
 **`invalid config:` followed by `/agents/1/…: …` lines**\
 `rin.yml` breaks the schema. Each line gives the path of the bad value. Common causes: a
 missing required field, a second `type: leader`, `harness: pi` with
 `authentication: subscription`, or `ram: 2G` (lowercase `m`/`g` only). See the
-[rin.yml reference](/rin/reference/config/).
+[rin.yml reference](/reference/config/).
 
 **`instructions don't match rin.yml:`**\
 Every agent needs `agents/<id>/INSTRUCTIONS.md`, and every directory in `agents/` must be
@@ -72,7 +72,7 @@ missing.
 
 **`timeout: …`**\
 The message took longer than `messaging.timeout`. See
-[Timeout](/rin/guides/messaging/#timeout) for the three variants. If agents are waiting on
+[Timeout](/guides/messaging/#timeout) for the three variants. If agents are waiting on
 each other, `rin status` shows a deadlock warning.
 
 **`hop limit reached: this message would be hop 6, maxHops is 5`**\
@@ -89,7 +89,7 @@ long content in a file in the agent's home and send the path.
 ## API keys
 
 **`warning: …/keys.env is missing: API-key agents will fail`**\
-See [API key](/rin/guides/authentication/#api-key). Create the file, then `rin generate`
+See [API key](/guides/authentication/#api-key). Create the file, then `rin generate`
 and `rin up`.
 
 **`runtime: pi model "…" can't be routed through Bifrost`** (in the agent's container logs)\

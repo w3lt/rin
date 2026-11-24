@@ -24,7 +24,7 @@ pi has no subscription sign-in: pi agents always use `apiKey`.
 ## API key
 
 Your provider keys live in one file on your machine, **`~/.rin/keys.env`**
-(`$RIN_HOME/keys.env` if you set [`RIN_HOME`](/rin/reference/files/#environment)):
+(`$RIN_HOME/keys.env` if you set [`RIN_HOME`](/reference/files/#environment)):
 
 ```sh
 mkdir -p -m 700 ~/.rin

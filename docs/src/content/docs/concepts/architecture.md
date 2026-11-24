@@ -39,7 +39,7 @@ Your `INSTRUCTIONS.md` is mounted read-only where the harness reads its instruct
 
 **Bifrost**, only when an agent uses an API key, is an LLM gateway holding your provider
 keys. API-key agents reach their provider through it, with a key of their own that is only
-good for Bifrost. See [Subscriptions and API keys](/rin/guides/authentication/).
+good for Bifrost. See [Subscriptions and API keys](/guides/authentication/).
 
 ## A message's trip
 
@@ -83,7 +83,7 @@ the same tools on every machine.
 | What | Where |
 | :--- | :---- |
 | Your config and instructions | Your project directory, anywhere |
-| The generated team | `~/.rin/teams/<name>/` ([layout](/rin/reference/files/)) |
+| The generated team | `~/.rin/teams/<name>/` ([layout](/reference/files/)) |
 | Provider keys | `~/.rin/keys.env` |
 | Agent homes | Docker volumes `rin-<name>-<id>-home` |
 | Message log | Docker volume `rin-<name>-hub` |

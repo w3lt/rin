@@ -16,7 +16,7 @@ other, and you can message any of them yourself.
 - **One container per agent.** Every agent has its own Linux environment and its own home
   directory, kept in a Docker volume. Stopping the team does not lose it.
 - **A choice of harness per agent.** A harness is the coding-agent program the agent runs:
-  [Claude Code, Codex, Antigravity or pi](/rin/reference/harnesses/). One team can mix them.
+  [Claude Code, Codex, Antigravity or pi](/reference/harnesses/). One team can mix them.
 - **Subscriptions or API keys.** Agents sign in with their tool's own subscription, or use
   an API key you keep in one file on your machine. Keys never enter the agents' containers.
 - **Messages with a reply.** A message starts a fresh session on the receiving agent, and its
@@ -49,6 +49,6 @@ rin down                    # stop; homes and the log are kept
 
 ## Next
 
-- [Install Rin](/rin/start/installation/)
-- [Run your first team](/rin/start/quickstart/)
-- [How the pieces fit together](/rin/concepts/architecture/)
+- [Install Rin](/start/installation/)
+- [Run your first team](/start/quickstart/)
+- [How the pieces fit together](/concepts/architecture/)

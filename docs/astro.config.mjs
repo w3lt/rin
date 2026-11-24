@@ -2,12 +2,10 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
-// Served by GitHub Pages as a project site, so every page lives under `base`.
-// Links between pages must include it (`/rin/guides/...`): Starlight only adds
-// it to the sidebar, not to links written in Markdown.
+// Served by GitHub Pages at the root of its custom domain (set in the repository's
+// Pages settings), so links between pages start at `/` (`/guides/team/`).
 export default defineConfig({
-	site: 'https://w3lt.github.io',
-	base: '/rin',
+	site: 'https://rin.nent.io',
 	integrations: [
 		starlight({
 			title: 'Rin',

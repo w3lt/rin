@@ -10,7 +10,7 @@ description: Install the rin command with Homebrew or cargo, and check Docker an
 - **macOS on Apple silicon, or Linux** (x86-64 or ARM64) for the prebuilt binaries.
   With `cargo` you can build Rin anywhere Rust and Docker run.
 - About **2 GB of memory per agent** with the starter team's limits, which you can change
-  in [`resources`](/rin/reference/config/#resources).
+  in [`resources`](/reference/config/#resources).
 
 ## Install
 
@@ -43,8 +43,8 @@ rin --version
 ```
 
 The version matters: a team's `rin.yml` names the exact Rin version it was written for,
-and [`rin generate`](/rin/reference/cli/#rin-generate) refuses a file written for another
-one. See [`version`](/rin/reference/config/#version).
+and [`rin generate`](/reference/cli/#rin-generate) refuses a file written for another
+one. See [`version`](/reference/config/#version).
 
 ## Shell completions
 
@@ -63,4 +63,4 @@ rin completions fish > ~/.config/fish/completions/rin.fish
 
 Upgrade the binary, then change `version:` in each team's `rin.yml` to the new version and
 run `rin generate` and `rin up` again. The images are rebuilt for the new version; agents'
-homes and the message log are kept. See [Changing a team](/rin/guides/lifecycle/).
+homes and the message log are kept. See [Changing a team](/guides/lifecycle/).

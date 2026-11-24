@@ -1,11 +1,11 @@
 # Rin documentation
 
 The user documentation for Rin, built with [Starlight](https://starlight.astro.build) and
-published to <https://w3lt.github.io/rin/> from `main`.
+published to <https://rin.nent.io/> from `main`.
 
 ```sh
 pnpm install
-pnpm dev       # http://localhost:4321/rin/
+pnpm dev       # http://localhost:4321/
 pnpm build     # the site, in dist/
 pnpm preview   # serve dist/
 ```
@@ -24,8 +24,8 @@ hand in `astro.config.mjs`, so add a new page there too.
 
 ## Conventions
 
-- **Links between pages include the base path**: `/rin/guides/team/`, not `/guides/team/`.
-  Starlight adds it to the sidebar only.
+- **Links between pages are absolute from the site root**: `/guides/team/`, with the trailing
+  slash.
 - **The code is the source of truth.** Commands and flags come from `src/main.rs` and
   `src/host_cli.rs`, `rin.yml` fields and defaults from `rin-schema.json` and
   `src/shared/config.rs`, error messages from where they are raised. Quote error messages

@@ -4,7 +4,7 @@ description: Create a starter team, start it, sign the agents in and send the fi
 ---
 
 This page takes you from nothing to a running team of four agents. It assumes
-[Rin and Docker are installed](/rin/start/installation/).
+[Rin and Docker are installed](/start/installation/).
 
 ## 1. Create a project
 
@@ -36,7 +36,7 @@ The starter team has a leader and three members:
 
 Edit it as you like: drop the agents whose tools you don't use, change models and limits.
 Every agent in `rin.yml` needs its `agents/<id>/INSTRUCTIONS.md`, and every directory in
-`agents/` must be an agent. [Design your team](/rin/guides/team/) covers the options.
+`agents/` must be an agent. [Design your team](/guides/team/) covers the options.
 
 ## 2. Add your API keys
 
@@ -50,7 +50,7 @@ echo 'ANTHROPIC_API_KEY=sk-ant-...' >> ~/.rin/keys.env
 ```
 
 If you have no key, remove `devops` from `rin.yml` and delete `agents/devops`.
-[Subscriptions and API keys](/rin/guides/authentication/) explains how keys are kept away
+[Subscriptions and API keys](/guides/authentication/) explains how keys are kept away
 from the agents.
 
 ## 3. Generate the team
@@ -120,6 +120,6 @@ rin down      # stop the team
 
 ## Next
 
-- [Design your team](/rin/guides/team/): roles, harnesses, instructions and limits.
-- [Talking to agents](/rin/guides/messaging/): sessions, hops, timeouts and deadlocks.
-- [CLI reference](/rin/reference/cli/)
+- [Design your team](/guides/team/): roles, harnesses, instructions and limits.
+- [Talking to agents](/guides/messaging/): sessions, hops, timeouts and deadlocks.
+- [CLI reference](/reference/cli/)

@@ -30,7 +30,7 @@ pi has no MCP support, so pi agents use the same `rin send <id> "<text>"` and `r
 commands you use, from their shell. Inside a container they need no setup: they act as that
 agent.
 
-You can also run `rin send` and `rin agents` in a [`rin shell`](/rin/reference/cli/#rin-shell);
+You can also run `rin send` and `rin agents` in a [`rin shell`](/reference/cli/#rin-shell);
 the message then comes from that agent, not from you.
 
 ## One message, one session
