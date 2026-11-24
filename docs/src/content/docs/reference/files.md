@@ -78,5 +78,7 @@ or use a commit hash as the revision.
 | `ANTHROPIC_API_KEY` | Anthropic |
 | `OPENAI_API_KEY` | OpenAI |
 | `GEMINI_API_KEY` | Google Gemini |
+| `OLLAMA_API_KEY` | Ollama Cloud |
+| any `apiKeyEnv` | that custom provider in [`llmProviders`](/reference/config/#llmproviders) |
 
 One `NAME=value` per line; lines starting with `#` are comments.

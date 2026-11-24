@@ -24,7 +24,7 @@ permission prompts turned off.
 | `claude-code` | yes: sign in with `claude` | `ANTHROPIC_API_KEY` | A Claude model, e.g. `claude-opus-5-5` |
 | `codex` | yes: sign in with `codex` | `OPENAI_API_KEY` | An OpenAI model, e.g. `gpt-6-luna` |
 | `antigravity` | yes: sign in with `agy` | `GEMINI_API_KEY` | A Gemini model, e.g. `gemini-3.8-flash` |
-| `pi` | no | by prefix | `anthropic/…`, `openai/…` or `google/…` |
+| `pi` | no | by prefix | `anthropic/…`, `openai/…`, `google/…`, `ollama/…` or `<custom provider>/…` |
 
 ## Messaging teammates
 

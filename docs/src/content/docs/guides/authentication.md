@@ -35,9 +35,11 @@ touch ~/.rin/keys.env && chmod 600 ~/.rin/keys.env
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
 GEMINI_API_KEY=...
+OLLAMA_API_KEY=...
 ```
 
-Set only the providers you use. Then generate and start the team:
+Set only the providers you use, plus the `apiKeyEnv` of any
+[custom provider](/reference/config/#llmproviders) your agents use. Then generate and start the team:
 
 ```sh
 rin generate --instructions agents
@@ -76,16 +78,20 @@ pi's `model` must name its provider, so Rin can route it through Bifrost:
 | `anthropic/<model>`   | `ANTHROPIC_API_KEY` |
 | `openai/<model>`      | `OPENAI_API_KEY`    |
 | `google/<model>`      | `GEMINI_API_KEY`    |
+| `ollama/<model>`      | `OLLAMA_API_KEY` (Ollama Cloud) |
+| `<id>/<model>`        | that provider's `apiKeyEnv`, or none if `apiKeyRequired: false` |
 
-A pi model without one of these prefixes gets no route through Bifrost, and the agent logs
-a warning when it starts.
+`<id>` is one of your [`llmProviders`](/reference/config/#llmproviders). `rin generate`
+refuses a pi model without one of these prefixes.
 
-### Warnings you may see
+### When a key is missing
 
-- `keys.env does not exist` (from `rin generate`) or `keys.env is missing: API-key agents
-  will fail` (from `rin up`): create the file, then run `rin generate` and `rin up`.
-- `keys.env sets none of ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY`: the file
-  exists but has no key Rin knows. Add one and generate again.
+- `rin generate` warns, naming the variables your API-key agents need that `keys.env`
+  doesn't set (or that the file doesn't exist). It still writes the team.
+- `rin up` refuses to start the team until they are set: add them, then run
+  `rin generate` and `rin up`.
+
+A team whose API-key agents only use keyless custom providers needs no `keys.env`.
 
 `rin status` shows whether Bifrost is up on its last line (`bifrost: running`) for teams
 that use it.

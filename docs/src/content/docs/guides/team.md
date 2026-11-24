@@ -64,8 +64,9 @@ Each agent runs one [harness](/reference/harnesses/):
 | `antigravity` | Antigravity  | `send_message`, `list_agents` (MCP) | `subscription` or `apiKey` |
 | `pi`          | pi           | `rin send`, `rin agents` (shell)    | `apiKey` only            |
 
-`model` is passed to the harness as is, so use the name that harness expects. pi with an API
-key needs a provider prefix: `anthropic/…`, `openai/…` or `google/…`. See
+`model` is passed to the harness as is, so use the name that harness expects. pi needs a
+provider prefix: `anthropic/…`, `openai/…`, `google/…`, `ollama/…` (Ollama Cloud) or one of
+your [`llmProviders`](/reference/config/#llmproviders). See
 [Subscriptions and API keys](/guides/authentication/).
 
 ## Writing instructions
