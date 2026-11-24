@@ -4,25 +4,34 @@
 # scripts/pr_checks.sh        the current branch's pull request
 # scripts/pr_checks.sh 12     pull request #12
 #
-# Exit 0: all checks passed with no findings, 1: something to triage, 2: error or timeout.
+# Exit 0: all checks passed with no findings, 1: error or timeout, 255: something to triage
 #
 # HAPPY HACKING!
 
 set -euo pipefail
 
-cd "$(dirname "$0")/.." || exit 2
+cd "$(dirname "$0")/.." || exit 1
 
 timeout=${PR_CHECKS_TIMEOUT:-600}
 # Some checks start well after a push, so trust the set only once no check has
 # started or finished for this long
-settle=${PR_CHECKS_SETTLE:-60}
+settle=${PR_CHECKS_SETTLE:-120}
 interval=15
 
 die() {
     local message="$1"
     echo "pr_checks: $message" >&2
-    exit 2
+    exit 1
 }
+
+[[ "$timeout" =~ ^[1-9][0-9]*$ ]] ||
+    die "PR_CHECKS_TIMEOUT must be a positive integer"
+
+[[ "$settle" =~ ^(0|[1-9][0-9]*)$ ]] ||
+    die "PR_CHECKS_SETTLE must be a non-negative integer"
+
+[[ "$#" -le 1 ]] ||
+    die "usage: scripts/pr_checks.sh [pull request number]"
 
 pr=${1:-}
 if [[ -z "$pr" ]]; then
@@ -31,7 +40,7 @@ fi
 [[ "$pr" =~ ^[0-9]+$ ]] || die "usage: scripts/pr_checks.sh [pull request number]"
 
 # One line per check: state, name, link. Check runs and commit statuses both count.
-checks_filter='.statusCheckRollup[]
+checks_filter='(.statusCheckRollup // [])[]
     | if .__typename == "CheckRun" then
         [(if .status == "COMPLETED" then .conclusion else "PENDING" end), .name, .detailsUrl]
       else
@@ -39,19 +48,23 @@ checks_filter='.statusCheckRollup[]
       end
     | @tsv'
 # Seconds since the last check started or finished
-quiet_filter='[.statusCheckRollup[] | .completedAt, .startedAt, .createdAt
+quiet_filter='[(.statusCheckRollup // [])[] | .completedAt, .startedAt, .createdAt
     | select(. != null and (startswith("0001-") | not)) | fromdateiso8601] | now - (max // now) | floor'
 
 # Re-read the pull request each round, so a push during the wait is followed
 while :; do
-    view="$(gh pr view "$pr" --json headRefOid,statusCheckRollup)" || die "cannot read pull request #$pr"
-    head="$(jq -r .headRefOid <<<"$view")"
-    checks="$(jq -r "$checks_filter" <<<"$view")"
-    quiet="$(jq -r "$quiet_filter" <<<"$view")" || die "cannot read the checks of #$pr"
-    if [[ -n "$checks" ]] && ! grep -q '^PENDING' <<<"$checks"; then
+    view="$(gh pr view "$pr" --json headRefOid,statusCheckRollup)" ||
+        die "cannot read pull request #$pr"
+    head="$(jq -r .headRefOid <<<"$view")" ||
+        die "cannot read the head commit of #$pr"
+    checks="$(jq -r "$checks_filter" <<<"$view")" ||
+        die "cannot parse the checks of #$pr"
+    quiet="$(jq -r "$quiet_filter" <<<"$view")" ||
+        die "cannot read the checks of #$pr"
+    if [[ -n "$checks" ]] && ! grep -q '^PENDING'$'\t' <<<"$checks"; then
         # At the timeout, report finished checks rather than wait for late ones
-        [[ "$quiet" -ge "$settle" || "$SECONDS" -ge "$timeout" ]] && break
-    elif [[ "$SECONDS" -ge "$timeout" ]]; then
+        (( quiet >= settle || SECONDS >= timeout )) && break
+    elif (( SECONDS >= timeout )); then
         [[ -n "$checks" ]] || die "no check reported on ${head:0:7} of #$pr after ${timeout}s"
         die "checks on ${head:0:7} of #$pr unfinished after ${timeout}s; see gh pr checks $pr"
     fi
@@ -80,7 +93,7 @@ echo "#$pr at ${head:0:7}: $(grep -c . <<<"$checks") check(s), $failing failing,
 echo "$checks"
 [[ -z "$findings" ]] || echo "$findings"
 
-if [[ "$failing" -eq 0 && "$n_findings" -eq 0 ]]; then
+if (( failing == 0 && n_findings == 0 )); then
     exit 0
 fi
-exit 1
+exit 255

@@ -33,6 +33,9 @@ get() {
         "$api/$path"
 }
 
+[[ "$#" -le 1 ]] ||
+    die "usage: scripts/sonar_issues.sh [pull request number]"
+
 [[ "$timeout" =~ ^[1-9][0-9]*$ ]] ||
     die "SONAR_TIMEOUT must be a positive integer"
 

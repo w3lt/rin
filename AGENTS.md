@@ -12,8 +12,8 @@
   unrelated to the change, and before `scripts/verify_docker.sh` to see whether Docker is usable here.
 - `scripts/pr_checks.sh [pr]`: waits for every status check on a pull request's head commit, then lists each
   check and the findings it annotated on the code. A passing check can still report findings.
-- `scripts/sonar_issues.sh [pr]`: the SonarCloud check's open issues on a pull request, with rule keys, from the
-  public API (no token). Its quality gate passes with open issues.
+- `scripts/sonar_issues.sh [pr]`: the Sonar scan open issues on a pull request.
+  Its quality gate can still pass with open issues.
 - One test: `cargo test --all-features <name>`. Plain `cargo test` skips the
   end-to-end tests in `src/tests.rs`, which need all three features.
 - Git hooks live in `.githooks/`; enable them once per clone with `git config core.hooksPath .githooks`.
