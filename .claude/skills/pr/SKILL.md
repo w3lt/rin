@@ -1,6 +1,6 @@
 ---
 name: pr
-description: Open or update a Rin pull request - review-loop first, the repo's branch, title and template conventions, then triage the status checks after every push. Use when asked to make, open or update a PR.
+description: Open or update a Rin pull request - review-loop first, follow the repo's branch, title and template conventions, and triage the status checks after every push. Use when create, open or update a PR.
 argument-hint: "[PR or issue number] [base branch]"
 ---
 
@@ -9,10 +9,9 @@ argument-hint: "[PR or issue number] [base branch]"
 Open a pull request, or push more work to an existing one, and leave its status checks
 passing with no open findings. From the user: $ARGUMENTS
 
-- **Number:** GitHub numbers issues and pull requests together. `gh pr view <n>` finds it: the
-  PR to update. It says "Could not resolve to a PullRequest" and `gh issue view <n>` finds it:
-  the issue the PR closes; if the branch already has a PR, update that one and add the
-  `Closes` line to it. Anything else: report it and stop.
+- **Number:** an existing PR's number, or, when there is no PR yet, the number of
+  the issue it closes (fills `Closes #` and the branch name). Issues and PRs share numbers, so
+  try `gh pr view <n>`, then `gh issue view <n>`; if neither finds it, report it and stop.
 - **Base:** `main` unless the user names another branch (a lone non-numeric argument is the
   base). An existing PR keeps its base.
 
@@ -24,15 +23,16 @@ Current state:
 
 ## 1. Before pushing
 
-- `git fetch`. Work on a branch, never on the base: `feature/#<issue>-<slug>` from
-  `origin/<base>` when there is an issue, otherwise `feature/<slug>`. Releases use the
+- `git fetch`. Work on a branch, never on the base: from `origin/<base>`
+  `feature/#<issue>-<slug>` when there is an issue, otherwise `feature/<slug>`. Releases use the
   `release` skill instead.
 - Run the `review-loop` skill. It verifies, reviews and commits.
 
 ## 2. Push
 
-- Someone else pushed to the branch: `git pull --rebase` first. The base moved on after you
-  pushed: merge `origin/<base>` rather than rebase. Never rewrite pushed commits or force-push.
+- Someone else pushed to the branch: `git pull --rebase` first.
+- The base moved on after you pushed: merge `origin/<base>` rather than rebase.
+  Never rewrite pushed commits or force-push.
 - No PR yet: `gh pr create --base <base> --title '<title>' --body-file <file>`, writing the body
   file outside the repo (the scratchpad or a `mktemp` file):
   - **Title:** the commit form `.githooks/commit-msg` enforces, `<type>[(scope)]: <summary>`.
@@ -51,19 +51,18 @@ still report findings, so read what each check found, not only its state.
    background: it waits up to 10 minutes for every check on the head commit to finish, then
    lists each check and the findings it annotated (`level, check, file:line, title, message`).
    Exit 0: all passed, nothing open. Exit 1: triage. Exit 2: report the error.
-2. Whatever step 1 exits with, run the reader of each check that has one; it gives more than
+2. Regardless of the exit code from step 1, run the dedicated reader of each check that has one; it gives more than
    the annotations:
 
-   | Check | Reader |
-   |---|---|
+   | Check                    | Reader                                                                                               |
+   | ------------------------ | ---------------------------------------------------------------------------------------------------- |
    | SonarCloud Code Analysis | `scripts/sonar_issues.sh [pr]`: open issues with rule keys; its quality gate passes with open issues |
 
-   A new check without a reader: its state, annotations and link are what there is.
 3. Triage each failing check and each finding against the code:
    - Failing check without findings: open its link, find the cause, fix it.
    - Real finding: fix it in the style of the surrounding code.
    - False positive, or it would break a repo convention: do not change code. Note the check,
-     `file:line` and a one-line reason for the user; dismissing it needs write access there.
+     `file:line` and a one-line reason for the user on the pr's comment; Leave the dismissal of the finding to the user.
    - In code the PR did not touch: list it for the user instead of fixing it.
 4. Commit the fixes (`fix(<scope>): <what>`), run `scripts/verify_code.sh` (or `fast` when only
    scripts changed), push, and repeat from 1. Stop after 3 rounds and tell the user what is open.
