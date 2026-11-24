@@ -9,10 +9,12 @@ on:
     paths:
       - "docs/**"
       - ".github/workflows/docs.yml"
+      - "scripts/lib/check_docs_links.mjs"
   pull_request:
     paths:
       - "docs/**"
       - ".github/workflows/docs.yml"
+      - "scripts/lib/check_docs_links.mjs"
   workflow_dispatch:
 
 permissions:
@@ -41,6 +43,9 @@ jobs:
         with:
           path: docs
           node-version: 24
+
+      - name: Check links
+        run: node scripts/lib/check_docs_links.mjs docs/dist
 
   deploy:
     name: Deploy docs

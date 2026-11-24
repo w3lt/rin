@@ -18,7 +18,7 @@ Current state:
 ## Loop (at most 3 rounds)
 
 1. **Verify.** Delegate to the `verifier` subagent (`scripts/verify_code.sh`, or
-   `matrix` if a `#[cfg(feature …)]`, a `use` or a module declaration changed). On FAIL, fix
+   `matrix` if a `#[cfg(feature …)]`, a `use` or a module declaration changed; `scripts/verify_docs.sh` when `docs/` changed). On FAIL, fix
    the cause and verify again before reviewing.
 2. **Review.** Delegate to the `code-reviewer` subagent. Give it the task in one
    or two sentences and the diff range. Do not pass your reasoning or a list of
