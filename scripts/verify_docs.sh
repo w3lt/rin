@@ -13,8 +13,20 @@ lines=${VERIFY_LINES:-120}
 log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
 
-source script/lib/step.sh
+source scripts/lib/step.sh
 
+# The pnpm docs/package.json pins: another one refuses to install.
+pnpm_pin="$(sed -n 's/.*"packageManager": *"pnpm@\([^"]*\)".*/\1/p' docs/package.json)"
+pnpm_is_pinned() {
+    local v
+    v="$(pnpm --version)" || return 1
+    [[ "$v" = "$pnpm_pin" ]] || {
+        echo "pnpm $v, docs/package.json pins $pnpm_pin"
+        return 1
+    }
+}
+
+step pnpm pnpm_is_pinned
 step install pnpm --dir docs install --frozen-lockfile
 step build pnpm --dir docs build
 step links scripts/lib/check_docs_links.mjs docs/dist

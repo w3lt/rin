@@ -100,6 +100,19 @@ else
     fail cargo "not found; install from https://rustup.rs"
 fi
 
+# Docs site (scripts/verify_docs.sh)
+pnpm_pin="$(sed -n 's/.*"packageManager": *"pnpm@\([^"]*\)".*/\1/p' docs/package.json)"
+if have pnpm; then
+    v="$(pnpm --version 2>/dev/null | version_of)"
+    if [[ "$v" = "$pnpm_pin" ]]; then
+        ok pnpm "$v"
+    else
+        warn pnpm "$v, docs/package.json pins $pnpm_pin; scripts/verify_docs.sh needs it"
+    fi
+else
+    warn pnpm "not found; scripts/verify_docs.sh needs pnpm $pnpm_pin"
+fi
+
 if have docker; then
     ok docker "$(docker --version | version_of)"
     if docker info >/dev/null 2>&1; then
