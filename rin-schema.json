@@ -56,7 +56,7 @@
     },
     "llmProviders": {
       "type": "array",
-      "description": "Extra OpenAI-compatible providers for pi agents, besides the built-in openai, anthropic, google and ollama (Ollama Cloud). A pi agent uses one with model: <id>/<model>.",
+      "description": "Extra LLM providers , besides the built-in openai, anthropic, google and ollama (Ollama Cloud). A harness can use one with model: <id>/<model>.",
       "items": {
         "$ref": "#/$defs/llmProvider"
       }
@@ -131,7 +131,7 @@
       "properties": {
         "id": {
           "$ref": "#/$defs/id",
-          "description": "Unique; pi agents name it in model: <id>/<model>. openai, anthropic, google and ollama are built in.",
+          "description": "Identifier of the provider; a model will be under the form: <id>/<model>. openai, anthropic, google and ollama are built in.",
           "not": {
             "enum": ["openai", "anthropic", "google", "ollama"]
           }
@@ -142,7 +142,7 @@
         },
         "baseUrl": {
           "type": "string",
-          "description": "The base URL an OpenAI client takes, usually ending in /v1: chat completions are at <baseUrl>/chat/completions. Reached from Bifrost's container: use host.docker.internal for a server on your machine.",
+          "description": "The base url of the provider. Use your eyes to read the provider's documentation please",
           "pattern": "^https?://[^\\s/?#]+(/[^\\s?#]*)?$"
         },
         "apiKeyRequired": {
