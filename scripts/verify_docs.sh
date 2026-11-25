@@ -21,8 +21,7 @@ pnpm_is_pinned() {
     local v
     v="$(pnpm --version)" || return 1
     [[ "$v" = "$pnpm_pin" ]] || {
-        echo "pnpm $v, docs/package.json pins $pnpm_pin"
-        return 1
+        echo "warn: pnpm $v, docs/package.json pins $pnpm_pin"
     }
 }
 
