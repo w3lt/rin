@@ -13,7 +13,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-pub struct Settings<'a> {
+pub struct AgentSettings<'a> {
     pub harness: Harness,
     pub model: &'a str,
     /// The team's `messaging.timeout`.
@@ -32,7 +32,7 @@ pub fn tool_timeout(timeout: Duration) -> Duration {
 /// `RIN_SESSION` lets the runtime kill the server with its session.
 const MCP_ENV: [&str; 4] = ["RIN_TOKEN", "RIN_HUB_URL", "RIN_HOPS", "RIN_SESSION"];
 
-pub fn apply(home: &Path, settings: &Settings) -> Result<Vec<PathBuf>> {
+pub fn apply(home: &Path, settings: &AgentSettings) -> Result<Vec<PathBuf>> {
     let tool_timeout = tool_timeout(settings.timeout);
     let ms = tool_timeout.as_millis() as u64;
     let secs = tool_timeout.as_secs();
@@ -220,7 +220,7 @@ fn merge_json(path: &Path, edit: &dyn Fn(&mut Map<String, Value>)) -> Result<boo
     Ok(true)
 }
 
-fn merge_codex(path: &Path, settings: &Settings, tool_timeout_secs: u64) -> Result<bool> {
+fn merge_codex(path: &Path, settings: &AgentSettings, tool_timeout_secs: u64) -> Result<bool> {
     let text = read_or_empty(path)?;
     let original: toml::Table = toml::from_str(&text)
         .with_context(|| format!("{} is not valid TOML; fix or delete it", path.display()))?;
@@ -308,8 +308,12 @@ mod tests {
         serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap()
     }
 
-    fn settings(harness: Harness, model: &str, bifrost: Option<&'static str>) -> Settings<'static> {
-        Settings {
+    fn settings(
+        harness: Harness,
+        model: &str,
+        bifrost: Option<&'static str>,
+    ) -> AgentSettings<'static> {
+        AgentSettings {
             harness,
             model: Box::leak(model.to_string().into_boxed_str()),
             timeout: Duration::from_secs(1800),

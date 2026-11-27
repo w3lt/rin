@@ -356,7 +356,7 @@ pub async fn main() -> Result<()> {
 
     let written = settings::apply(
         &home,
-        &settings::Settings {
+        &settings::AgentSettings {
             harness,
             model: &model,
             timeout,
