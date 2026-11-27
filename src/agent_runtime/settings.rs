@@ -65,12 +65,14 @@ pub fn apply(home: &Path, settings: &AgentSettings) -> Result<Vec<PathBuf>> {
         }
         Harness::Pi => {
             let provider = split_model(settings.model).map(|(provider, _)| provider);
-            let pi = PiModel::of(settings.model);
-            let added = pi.added.then_some(pi.provider.as_deref()).flatten();
-            let pi_model = &pi.id;
+            let pi_model = PiModel::of(settings.model);
+            let extra_provider = (!pi_model.builtin)
+                .then_some(pi_model.provider.as_deref())
+                .flatten();
+            let model_id = &pi_model.id;
             json(home.join(".pi/agent/settings.json"), &|s| {
-                s.insert("defaultModel".into(), json!(pi.id));
-                if let Some(provider) = &pi.provider {
+                s.insert("defaultModel".into(), json!(model_id));
+                if let Some(provider) = &pi_model.provider {
                     s.insert("defaultProvider".into(), json!(provider));
                 }
             })?;
@@ -81,7 +83,7 @@ pub fn apply(home: &Path, settings: &AgentSettings) -> Result<Vec<PathBuf>> {
                     Some("google") => Some(("google", format!("{bifrost}/genai"))),
                     _ => None,
                 };
-                match (added, route) {
+                match (extra_provider, route) {
                     (Some(name), _) => json(home.join(".pi/agent/models.json"), &|s| {
                         let entry = object(object(s, "providers"), name);
                         entry.insert("baseUrl".into(), json!(format!("{bifrost}/openai/v1")));
@@ -89,8 +91,8 @@ pub fn apply(home: &Path, settings: &AgentSettings) -> Result<Vec<PathBuf>> {
                         // The name of the variable holding the agent's virtual key.
                         entry.insert("apiKey".into(), json!("OPENAI_API_KEY"));
                         let models = array(entry, "models");
-                        if !models.iter().any(|m| m.get("id") == Some(&json!(pi_model))) {
-                            models.push(json!({ "id": pi_model }));
+                        if !models.iter().any(|m| m.get("id") == Some(&json!(model_id))) {
+                            models.push(json!({ "id": model_id }));
                         }
                     })?,
                     (None, Some((provider, url))) => {
@@ -133,7 +135,7 @@ pub struct PiModel {
     pub provider: Option<String>,
     pub id: String,
     /// A provider Rin adds to pi (Ollama or a custom one), rather than one of pi's own.
-    pub added: bool,
+    pub builtin: bool,
 }
 
 impl PiModel {
@@ -145,7 +147,7 @@ impl PiModel {
             return PiModel {
                 provider: None,
                 id: model.to_string(),
-                added: false,
+                builtin: true,
             };
         };
         let added = match provider {
@@ -157,12 +159,12 @@ impl PiModel {
             Some(pi_provider) => PiModel {
                 id: format!("{pi_provider}/{name}"),
                 provider: Some(pi_provider),
-                added: true,
+                builtin: false,
             },
             None => PiModel {
                 provider: Some(provider.to_string()),
                 id: name.to_string(),
-                added: false,
+                builtin: true,
             },
         }
     }
