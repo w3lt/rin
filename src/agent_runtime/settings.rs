@@ -19,7 +19,7 @@ pub struct AgentSettings<'a> {
     /// The team's `messaging.timeout`.
     pub timeout: Duration,
     /// Bifrost's URL, for API-key agents.
-    pub bifrost: Option<&'a str>,
+    pub bifrost_url: Option<&'a str>,
 }
 
 /// How long a harness lets the `rin` MCP tool run: a little above the team's
@@ -74,7 +74,7 @@ pub fn apply(home: &Path, settings: &AgentSettings) -> Result<Vec<PathBuf>> {
                     s.insert("defaultProvider".into(), json!(provider));
                 }
             })?;
-            if let Some(bifrost) = settings.bifrost {
+            if let Some(bifrost) = settings.bifrost_url {
                 let route = match provider {
                     Some("anthropic") => Some(("anthropic", format!("{bifrost}/anthropic"))),
                     Some("openai") => Some(("openai", format!("{bifrost}/openai/v1"))),
@@ -116,7 +116,7 @@ pub fn apply(home: &Path, settings: &AgentSettings) -> Result<Vec<PathBuf>> {
             })?;
             json(home.join(".gemini/antigravity-cli/settings.json"), &|s| {
                 s.insert("model".into(), json!(settings.model));
-                if settings.bifrost.is_some() {
+                if settings.bifrost_url.is_some() {
                     s.insert("modelProvider".into(), json!("gemini"));
                 } else if s.get("modelProvider") == Some(&json!("gemini")) {
                     // Switched back to a subscription: stop using the API key.
@@ -240,7 +240,7 @@ fn merge_codex(path: &Path, settings: &AgentSettings, tool_timeout_secs: u64) ->
     );
     toml_table(&mut table, "mcp_servers").insert("rin".into(), toml::Value::Table(rin));
 
-    match settings.bifrost {
+    match settings.bifrost_url {
         Some(bifrost) => {
             table.insert("model_provider".into(), "bifrost".into());
             let mut provider = toml::Table::new();
@@ -317,7 +317,7 @@ mod tests {
             harness,
             model: Box::leak(model.to_string().into_boxed_str()),
             timeout: Duration::from_secs(1800),
-            bifrost,
+            bifrost_url: bifrost,
         }
     }
 

@@ -360,7 +360,7 @@ pub async fn main() -> Result<()> {
             harness,
             model: &model,
             timeout,
-            bifrost: bifrost.as_deref(),
+            bifrost_url: bifrost.as_deref(),
         },
     )
     .context("cannot write harness settings")?;
