@@ -15,12 +15,12 @@ pnpm preview   # serve dist/
 Pages are Markdown in `src/content/docs/`; the URL follows the path. The sidebar is listed by
 hand in `astro.config.mjs`, so add a new page there too.
 
-| Directory     | For                                                   |
-| :------------ | :---------------------------------------------------- |
-| `start/`      | First contact: what Rin is, installing, a first team  |
-| `guides/`     | Doing one thing: a task from start to finish          |
-| `concepts/`   | How Rin works, for readers who want the model         |
-| `reference/`  | Complete and exact: every command, field and file     |
+| Directory    | For                                                  |
+| :----------- | :--------------------------------------------------- |
+| `start/`     | First contact: what Rin is, installing, a first team |
+| `guides/`    | Doing one thing: a task from start to finish         |
+| `concepts/`  | How Rin works, for readers who want the model        |
+| `reference/` | Complete and exact: every command, field and file    |
 
 ## Conventions
 
@@ -32,9 +32,9 @@ hand in `astro.config.mjs`, so add a new page there too.
   exactly, so readers can search for them.
 - When a change to Rin changes a command, flag, field, default or message, update these pages
   in the same pull request.
-- **Examples pin the current version** (`version: 0.1.2` and the `refs/tags/v0.1.2` schema
+- **Examples pin the current version** (`version: 0.2.0` and the `refs/tags/v0.2.0` schema
   URL), because `rin generate` refuses any other. Update them on every release:
-  `grep -rn '0\.1\.2' src/content/docs`.
+  `grep -rn '0\.2\.0' src/content/docs`.
 - Plain words, short sentences, present tense. Address the reader as "you".
 
 ## Publishing

@@ -9,10 +9,10 @@ agent, which tells that agent who it is and what it owns.
 ## A minimal team
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/w3lt/rin/refs/tags/v0.1.2/rin-schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/w3lt/rin/refs/tags/v0.2.0/rin-schema.json
 rin: tohsaka
 name: duo
-version: 0.1.2
+version: 0.2.0
 
 agents:
   - id: lead
@@ -57,12 +57,12 @@ and that they may ask teammates for what they need.
 
 Each agent runs one [harness](/reference/harnesses/):
 
-| `harness`     | Tool         | Messages teammates with      | `authentication`         |
-| :------------ | :----------- | :--------------------------- | :----------------------- |
-| `claude-code` | Claude Code  | `send_message`, `list_agents` (MCP) | `subscription` or `apiKey` |
-| `codex`       | Codex        | `send_message`, `list_agents` (MCP) | `subscription` or `apiKey` |
-| `antigravity` | Antigravity  | `send_message`, `list_agents` (MCP) | `subscription` or `apiKey` |
-| `pi`          | pi           | `rin send`, `rin agents` (shell)    | `apiKey` only            |
+| `harness`     | Tool        | Messages teammates with             | `authentication`           |
+| :------------ | :---------- | :---------------------------------- | :------------------------- |
+| `claude-code` | Claude Code | `send_message`, `list_agents` (MCP) | `subscription` or `apiKey` |
+| `codex`       | Codex       | `send_message`, `list_agents` (MCP) | `subscription` or `apiKey` |
+| `antigravity` | Antigravity | `send_message`, `list_agents` (MCP) | `subscription` or `apiKey` |
+| `pi`          | pi          | `rin send`, `rin agents` (shell)    | `apiKey` only              |
 
 `model` is passed to the harness as is, so use the name that harness expects. pi needs a
 provider prefix: `anthropic/…`, `openai/…`, `google/…`, `ollama/…` (Ollama Cloud) or one of

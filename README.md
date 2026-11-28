@@ -86,7 +86,7 @@ brew install w3lt/tap/rin        # macOS (Apple silicon) or Linux
 cargo install --locked tohsaka   # or from crates.io, on any platform
 ```
 
-On crates.io the package is called `tohsaka`. The command you get is `rin`. Its version must match `version:` in `rin.yml` (0.1.2 in the example). Homebrew also sets up shell completions; with `cargo`, `rin completions <shell>` prints them.
+On crates.io the package is called `tohsaka`. The command you get is `rin`. Its version must match `version:` in `rin.yml` (0.2.0 in the example). Homebrew also sets up shell completions; with `cargo`, `rin completions <shell>` prints them.
 
 ### 2 ・ Hand over the keys
 

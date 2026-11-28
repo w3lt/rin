@@ -9,10 +9,10 @@ into the `rin` binary, so every `rin` of a version checks a config the same way.
 fields are errors.
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/w3lt/rin/refs/tags/v0.1.2/rin-schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/w3lt/rin/refs/tags/v0.2.0/rin-schema.json
 rin: tohsaka
 name: my-team
-version: 0.1.2
+version: 0.2.0
 
 messaging:
   timeout: 30m
@@ -33,14 +33,14 @@ agents:
 
 ## Top level
 
-| Field | Type | Required | Default |
-| :---- | :--- | :------- | :------ |
-| [`rin`](#rin) | `tohsaka` | yes | |
-| [`name`](#name) | string | yes | |
-| [`version`](#version) | string | yes | |
-| [`messaging`](#messaging) | object | no | see below |
-| [`agents`](#agents) | list | yes | |
-| [`llmProviders`](#llmproviders) | list | no | none |
+| Field                           | Type      | Required | Default   |
+| :------------------------------ | :-------- | :------- | :-------- |
+| [`rin`](#rin)                   | `tohsaka` | yes      |           |
+| [`name`](#name)                 | string    | yes      |           |
+| [`version`](#version)           | string    | yes      |           |
+| [`messaging`](#messaging)       | object    | no       | see below |
+| [`agents`](#agents)             | list      | yes      |           |
+| [`llmProviders`](#llmproviders) | list      | no       | none      |
 
 ### `rin`
 
@@ -63,10 +63,10 @@ version's tag, so everyone using the config gets the same team.
 
 ## `messaging`
 
-| Field | Type | Default | Limits |
-| :---- | :--- | :------ | :----- |
-| `timeout` | string | `30m` | Whole minutes, as `<n>m`; from `1m` to a year (`525600m`). |
-| `maxHops` | integer | `5` | At least 1. |
+| Field     | Type    | Default | Limits                                                     |
+| :-------- | :------ | :------ | :--------------------------------------------------------- |
+| `timeout` | string  | `30m`   | Whole minutes, as `<n>m`; from `1m` to a year (`525600m`). |
+| `maxHops` | integer | `5`     | At least 1.                                                |
 
 **`timeout`** is how long one message may take from the moment it is sent, waiting in a
 queue included. **`maxHops`** is the longest chain of messages allowed: your message is
@@ -77,16 +77,16 @@ hop 1, a message sent while handling it hop 2. See
 
 A list of at least one agent, with **exactly one** `type: leader`. Ids must be unique.
 
-| Field | Type | Required | Default |
-| :---- | :--- | :------- | :------ |
-| [`id`](#id) | string | yes | |
-| [`type`](#type) | `leader` \| `member` | yes | |
-| [`label`](#label) | string | yes | |
-| [`harness`](#harness) | `claude-code` \| `codex` \| `antigravity` \| `pi` | yes | |
-| [`authentication`](#authentication) | `subscription` \| `apiKey` | yes | |
-| [`model`](#model) | string | yes | |
-| [`maxSessions`](#maxsessions) | integer | no | `3` |
-| [`resources`](#resources) | object | yes | |
+| Field                               | Type                                              | Required | Default |
+| :---------------------------------- | :------------------------------------------------ | :------- | :------ |
+| [`id`](#id)                         | string                                            | yes      |         |
+| [`type`](#type)                     | `leader` \| `member`                              | yes      |         |
+| [`label`](#label)                   | string                                            | yes      |         |
+| [`harness`](#harness)               | `claude-code` \| `codex` \| `antigravity` \| `pi` | yes      |         |
+| [`authentication`](#authentication) | `subscription` \| `apiKey`                        | yes      |         |
+| [`model`](#model)                   | string                                            | yes      |         |
+| [`maxSessions`](#maxsessions)       | integer                                           | no       | `3`     |
+| [`resources`](#resources)           | object                                            | yes      |         |
 
 ### `id`
 
@@ -131,10 +131,10 @@ first come first served.
 
 The container's limits. Both fields are required.
 
-| Field | Type | Example | Rule |
-| :---- | :--- | :------ | :--- |
-| `cpus` | number | `1`, `0.5`, `2` | Greater than 0. CPU cores (Compose `cpus`). |
-| `ram` | string | `512m`, `4g` | A whole number from 1, then `m` or `g`, lowercase (Compose `mem_limit`). |
+| Field  | Type   | Example         | Rule                                                                     |
+| :----- | :----- | :-------------- | :----------------------------------------------------------------------- |
+| `cpus` | number | `1`, `0.5`, `2` | Greater than 0. CPU cores (Compose `cpus`).                              |
+| `ram`  | string | `512m`, `4g`    | A whole number from 1, then `m` or `g`, lowercase (Compose `mem_limit`). |
 
 ## `llmProviders`
 
@@ -163,13 +163,13 @@ agents:
     # ...
 ```
 
-| Field | Type | Required | Rule |
-| :---- | :--- | :------- | :--- |
-| `id` | string | yes | Unique. Same pattern as an agent's [`id`](#id); not `anthropic`, `openai`, `google` or `ollama`. |
-| `type` | `openai` | yes | The API the provider speaks: OpenAI chat completions. |
-| `baseUrl` | string | yes | `http://` or `https://`: the base URL an OpenAI client takes, usually ending in `/v1`. Requests go to `<baseUrl>/chat/completions`. |
-| `apiKeyRequired` | boolean | yes | Whether the provider needs a key: usually `true` for cloud providers, `false` for local ones. |
-| `apiKeyEnv` | string | if `apiKeyRequired` | The variable in [`keys.env`](/guides/authentication/#api-key) holding the key, such as `GROQ_API_KEY`. Not allowed when `apiKeyRequired` is `false`; can't start with `BIFROST_` or `RIN_`. |
+| Field            | Type     | Required            | Rule                                                                                                                                                                                        |
+| :--------------- | :------- | :------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`             | string   | yes                 | Unique. Same pattern as an agent's [`id`](#id); not `anthropic`, `openai`, `google` or `ollama`.                                                                                            |
+| `type`           | `openai` | yes                 | The API the provider speaks: OpenAI chat completions.                                                                                                                                       |
+| `baseUrl`        | string   | yes                 | `http://` or `https://`: the base URL an OpenAI client takes, usually ending in `/v1`. Requests go to `<baseUrl>/chat/completions`.                                                         |
+| `apiKeyRequired` | boolean  | yes                 | Whether the provider needs a key: usually `true` for cloud providers, `false` for local ones.                                                                                               |
+| `apiKeyEnv`      | string   | if `apiKeyRequired` | The variable in [`keys.env`](/guides/authentication/#api-key) holding the key, such as `GROQ_API_KEY`. Not allowed when `apiKeyRequired` is `false`; can't start with `BIFROST_` or `RIN_`. |
 
 `baseUrl` is reached from Bifrost's container, so `localhost` is Bifrost itself: for a
 server on your machine, such as a local Ollama, vLLM or LM Studio, use
@@ -181,7 +181,7 @@ containers can reach, not only `127.0.0.1`.
 Add the schema line as the first line of the file, with your version:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/w3lt/rin/refs/tags/v0.1.2/rin-schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/w3lt/rin/refs/tags/v0.2.0/rin-schema.json
 ```
 
 Editors with a YAML language server then complete fields and flag mistakes as you type.

@@ -16,14 +16,14 @@ docker compose -p rin-<name> -f ~/.rin/teams/<name>/docker-compose.yml logs <id>
 
 ## Generating
 
-**`` no current team: run `rin generate` first, or pass --team <name> ``**\
+**``no current team: run `rin generate` first, or pass --team <name>``**\
 No team has been generated yet on this machine (or in this `RIN_HOME`).
 
-**`` unknown team "x": no …/rin.json (run `rin generate`) ``**\
+**``unknown team "x": no …/rin.json (run `rin generate`)``**\
 `--team` or `rin use` names a team that hasn't been generated. Teams are named by the
 `name` in their `rin.yml`, not by a directory.
 
-**`` version 0.1.1 does not match this rin (0.1.2); install rin 0.1.1 or change `version:` ``**\
+**`` version 0.1.2 does not match this rin (0.2.0); install rin 0.1.2 or change `version:` ``**\
 The file was written for another Rin version. Install that version, or
 [upgrade the team](/guides/lifecycle/#upgrade-rin).
 
@@ -62,7 +62,7 @@ The agent's container isn't running. `rin status` shows its state; `rin up` star
 **`cannot reach the hub at http://127.0.0.1:10302`**\
 The team isn't up, or another team is. `rin status` shows which.
 
-**`` session failed: <id> refused the hub (not authorized: wrong token); `rin up` restarts it with the current tokens.json ``**\
+**``session failed: <id> refused the hub (not authorized: wrong token); `rin up` restarts it with the current tokens.json``**\
 Tokens were regenerated but the agent still runs with the old one. Run `rin up`.
 
 **`session failed: claude exited with …`** (or `codex`, `agy`, `pi`)\

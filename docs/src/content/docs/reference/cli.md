@@ -7,19 +7,19 @@ description: Every rin command, its arguments and flags.
 rin [--team <NAME>] <COMMAND>
 ```
 
-| Command | What it does |
-| :------ | :----------- |
-| [`rin init`](#rin-init) | Write a starter project |
-| [`rin generate`](#rin-generate) | Check `rin.yml` and prepare the team; make it current |
-| [`rin use`](#rin-use) | Switch the current team |
-| [`rin up`](#rin-up) | Start the team |
-| [`rin down`](#rin-down) | Stop the team |
-| [`rin shell`](#rin-shell) | Open a shell in an agent's container |
-| [`rin send`](#rin-send) | Message an agent and print its reply |
-| [`rin agents`](#rin-agents) | List the team's agents |
-| [`rin status`](#rin-status) | Show state, sessions, queues and warnings |
-| [`rin log`](#rin-log) | Show the message history |
-| [`rin completions`](#rin-completions) | Print shell completions |
+| Command                               | What it does                                          |
+| :------------------------------------ | :---------------------------------------------------- |
+| [`rin init`](#rin-init)               | Write a starter project                               |
+| [`rin generate`](#rin-generate)       | Check `rin.yml` and prepare the team; make it current |
+| [`rin use`](#rin-use)                 | Switch the current team                               |
+| [`rin up`](#rin-up)                   | Start the team                                        |
+| [`rin down`](#rin-down)               | Stop the team                                         |
+| [`rin shell`](#rin-shell)             | Open a shell in an agent's container                  |
+| [`rin send`](#rin-send)               | Message an agent and print its reply                  |
+| [`rin agents`](#rin-agents)           | List the team's agents                                |
+| [`rin status`](#rin-status)           | Show state, sessions, queues and warnings             |
+| [`rin log`](#rin-log)                 | Show the message history                              |
+| [`rin completions`](#rin-completions) | Print shell completions                               |
 
 `rin --help` and `rin <command> --help` print the same, and `rin --version` the version.
 
@@ -44,10 +44,10 @@ Writes a starter project to `<DIR>/<NAME>`: a `rin.yml` with four agents, and on
 `agents/<id>/INSTRUCTIONS.md` per agent. The `rin.yml` pins this Rin's version and points
 editors at its schema.
 
-| Argument | Default | Description |
-| :------- | :------ | :---------- |
-| `<NAME>` | `rinteam` | Team name, also the project directory's name. Lowercase letters, digits and `-`, starting with a letter, at most 31 characters. |
-| `-d`, `--dir <DIR>` | `.` | Directory to create the project directory in. |
+| Argument            | Default   | Description                                                                                                                     |
+| :------------------ | :-------- | :------------------------------------------------------------------------------------------------------------------------------ |
+| `<NAME>`            | `rinteam` | Team name, also the project directory's name. Lowercase letters, digits and `-`, starting with a letter, at most 31 characters. |
+| `-d`, `--dir <DIR>` | `.`       | Directory to create the project directory in.                                                                                   |
 
 `rin init` never overwrites anything: it refuses if `<DIR>/<NAME>` is already a Rin project
 or any file it would write exists, and then writes nothing.
@@ -61,10 +61,10 @@ rin generate --instructions <DIR> [-f <FILE>]
 Checks the config and the instructions, then writes the team's directory to
 `$RIN_HOME/teams/<name>` and makes it the current team.
 
-| Argument | Default | Description |
-| :------- | :------ | :---------- |
-| `--instructions <DIR>` | required | Directory with one `<agent id>/INSTRUCTIONS.md` per agent. |
-| `-f`, `--file <FILE>` | `rin.yml` | The team config. |
+| Argument               | Default   | Description                                                |
+| :--------------------- | :-------- | :--------------------------------------------------------- |
+| `--instructions <DIR>` | required  | Directory with one `<agent id>/INSTRUCTIONS.md` per agent. |
+| `-f`, `--file <FILE>`  | `rin.yml` | The team config.                                           |
 
 It refuses, and writes nothing, when:
 
@@ -173,7 +173,7 @@ rin status
 Each agent's container state, with the hub's sessions and queues:
 
 ```
-team my-team (rin 0.1.2)
+team my-team (rin 0.2.0)
 ID        LABEL               TYPE    HARNESS      STATE    SESSIONS  QUEUED
 rinlead   Rin Lead            leader  claude-code  running  1/3       0
 backend   Backend Engineer    member  codex        running  0/3       0
@@ -196,9 +196,9 @@ rin log [-f] [<ID>]
 Prints the message history, oldest first: messages, replies, errors and warnings, with
 UTC times.
 
-| Argument | Description |
-| :------- | :---------- |
-| `<ID>` | Only messages to or from this agent. |
+| Argument         | Description                                                              |
+| :--------------- | :----------------------------------------------------------------------- |
+| `<ID>`           | Only messages to or from this agent.                                     |
 | `-f`, `--follow` | Keep printing new messages. Keeps following across restarts of the team. |
 
 The team must be up. The history itself is kept across `rin down`.
