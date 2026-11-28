@@ -37,6 +37,11 @@ CMD ["rin", "hub"]
 FROM node:26.13.1-trixie-slim AS nodejs
 
 FROM prebase AS base
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libatomic1 libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
 COPY --from=nodejs /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
