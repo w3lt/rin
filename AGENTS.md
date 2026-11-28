@@ -32,6 +32,10 @@
 - `rin-schema.json` is the `rin.yml` contract and is embedded in the binary. Tests use
   `examples/team/rin.yml` as a fixture, so example edits can break tests.
 
+## Investigations
+
+- For bug investigation requests, use the `investigate` skill.
+
 ## Changes
 
 - Keep changes focused on the requested task.
