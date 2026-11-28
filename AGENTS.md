@@ -32,6 +32,10 @@
 - `rin-schema.json` is the `rin.yml` contract and is embedded in the binary. Tests use
   `examples/team/rin.yml` as a fixture, so example edits can break tests.
 
+## Investigations
+
+- For bug investigation requests, use the `investigate` skill.
+
 ## Changes
 
 - Keep changes focused on the requested task.
@@ -40,7 +44,6 @@
 - Preserve compatibility across Cargo feature configurations.
 - Do not break existing public interfaces without justification.
 - Preserve persistent user data during generation, cleanup, and lifecycle changes.
-- For a bug, run the `investigate` skill: root cause and a failing test before the fix.
 - Before calling a non-trivial change done, run the `review-loop` skill: verify, independent review, fix, repeat.
 - Open or push to a pull request through the `pr` skill: conventions, then status checks after every push.
 
