@@ -43,14 +43,37 @@ The deliverable is a GitHub issue with an investigation report and proposed fix,
   | Agent runtime | `agent` | `src/agent_runtime.rs`, `src/agent_runtime/`                                 |
   | Container     | —       | `images/Dockerfile`, `src/compose.rs`                                        |
 
-- Test hypotheses against evidence,
-  prefer a targeted failing test or minimal reproducer.
-- For container-specific bugs, reproduce the reported behavior
-  in an isolated container environment.
-- Use a throwaway `RIN_HOME` and isolated worktree for experiments.
-  Clean up only resources created for the investigation.
-  Running teams are read-only: never restart them, modify their
-  homes or remove their volumes.
-- Stop when the cause is established or no evidence-backed
-  investigation path remains. Distinguish confirmed findings
-  from hypotheses.
+- Validate hypotheses against concrete evidence, preferably
+  through a targeted failing test or minimal reproducer.
+- Isolate experiments from the user's environment using
+  temporary Git worktrees, RIN_HOME and dedicated Docker
+  resources where applicable.
+- Never modify existing teams, persistent user data or the
+  user's working tree. Clean up only resources created
+  for the investigation.
+- Continue until the root cause is established. If further
+  investigation is not feasible, document the blockers and
+  unresolved questions.
+
+## 3. Publish the report
+
+Post a comment on the issue using
+`gh issue comment <n> --repo w3lt/rin --body-file <file>`:
+
+- **Symptom and reproduction:** expected vs actual behavior,
+  environment and tested revision.
+- **Root cause:** relevant `file:line` references and evidence.
+  Clearly distinguish confirmed findings from unverified
+  hypotheses. If the root cause remains unconfirmed, explain what
+  was ruled out and what evidence is missing.
+- **Proposed fix:** specific changes, affected components, risks
+  and regression tests. Mark the proposal as unimplemented and
+  unverified. If already fixed upstream, cite the relevant commit.
+- **Limitations:** untested paths, blockers and harness feedback
+  per AGENTS.md.
+
+Return the issue and comment URLs to the user. If publishing fails,
+return the report locally and state the failure.
+
+Do not implement the fix, modify the user's working tree, commit,
+push, open a PR or close the issue. A fix is a separate task.
