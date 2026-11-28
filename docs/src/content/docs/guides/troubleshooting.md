@@ -88,9 +88,13 @@ long content in a file in the agent's home and send the path.
 
 ## API keys
 
-**`warning: …/keys.env is missing: API-key agents will fail`**\
-See [API key](/guides/authentication/#api-key). Create the file, then `rin generate`
-and `rin up`.
+**`cannot start team …: …/keys.env does not exist`** or **`… does not set …`** (from `rin up`)\
+An API-key agent needs a key that `keys.env` doesn't have; the message names the variables.
+See [API key](/guides/authentication/#api-key). Add them, then `rin generate` and `rin up`.
 
-**`runtime: pi model "…" can't be routed through Bifrost`** (in the agent's container logs)\
-Write pi's model as `anthropic/<model>`, `openai/<model>` or `google/<model>`.
+**`pi model "…" must be <provider>/<model>`** (from `rin generate`)\
+Write pi's model as `<provider>/<model>`, with a built-in provider (`anthropic`, `openai`,
+`google`, `ollama`) or the `id` of one of your [`llmProviders`](/reference/config/#llmproviders).
+
+**`only pi agents can use provider "…"`** (from `rin generate`)\
+Ollama and custom providers are for pi agents; other harnesses use their own provider.

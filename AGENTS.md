@@ -8,7 +8,7 @@
 - `scripts/verify_docker.sh`: needs Docker; starts a throwaway team and checks every service stays up (see below).
 - `scripts/verify_docs.sh`: check the links between pages of the docs site inside `docs/`.
 - `scripts/inspect_environment.sh`: checks this machine's development environment: git, hooks, the Rust
-  toolchain (rustc ≥ 1.89, fmt, clippy), Docker and Compose (≥ 5.6). Run it when a check fails for reasons
+  toolchain (rustc ≥ 1.89, fmt, clippy), pnpm (the version `docs/package.json` pins), Docker and Compose (≥ 5.6). Run it when a check fails for reasons
   unrelated to the change, and before `scripts/verify_docker.sh` to see whether Docker is usable here.
 - `scripts/pr_checks.sh [pr]`: waits for every status check on a pull request's head commit, then lists each
   check and the findings it annotated on the code. A passing check can still report findings.

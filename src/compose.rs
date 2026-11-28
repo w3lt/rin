@@ -4,7 +4,7 @@
 use crate::shared::config::{Agent, Authentication, Config, Harness};
 use crate::yaml::{Yaml, list, map, s};
 
-pub const BIFROST_IMAGE: &str = "maximhq/bifrost:v2.5.1";
+pub const BIFROST_IMAGE: &str = "maximhq/bifrost:v2.7.0";
 pub const BIFROST_URL: &str = "http://bifrost:8080";
 
 pub struct Inputs<'a> {
@@ -154,31 +154,37 @@ pub fn render(inputs: &Inputs) -> String {
     }
 
     if config.uses_api_keys() {
-        services.push((
-            "bifrost".to_string(),
-            map([
-                ("image", s(BIFROST_IMAGE)),
-                ("hostname", s("bifrost")),
-                // Optional: a missing keys.env must not stop Compose (and `rin down`) from loading the project.
-                (
-                    "env_file",
-                    list([
-                        map([
-                            ("path", s("../../keys.env")),
-                            ("required", Yaml::Raw("false".into())),
-                        ]),
-                        s("./bifrost/bifrost.env"),
+        let mut bifrost = vec![
+            ("image", s(BIFROST_IMAGE)),
+            ("hostname", s("bifrost")),
+            // Optional: a missing keys.env must not stop Compose (and `rin down`) from loading the project.
+            (
+                "env_file",
+                list([
+                    map([
+                        ("path", s("../../keys.env")),
+                        ("required", Yaml::Raw("false".into())),
                     ]),
-                ),
-                (
-                    "volumes",
-                    list([
-                        s(format!("{}:/app/data", volume_name(config, "bifrost"))),
-                        s("./bifrost/config.json:/app/data/config.json:ro"),
-                    ]),
-                ),
-            ]),
-        ));
+                    s("./bifrost/bifrost.env"),
+                ]),
+            ),
+            (
+                "volumes",
+                list([
+                    s(format!("{}:/app/data", volume_name(config, "bifrost"))),
+                    s("./bifrost/config.json:/app/data/config.json:ro"),
+                ]),
+            ),
+        ];
+        // A custom provider may be a server on your machine: Docker Desktop has
+        // host.docker.internal, Linux needs it added.
+        if !config.llm_providers.is_empty() {
+            bifrost.push((
+                "extra_hosts",
+                list([s("host.docker.internal:host-gateway")]),
+            ));
+        }
+        services.push(("bifrost".to_string(), map(bifrost)));
         volumes.push(volume_name(config, "bifrost"));
     }
 

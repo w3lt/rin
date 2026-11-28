@@ -356,11 +356,11 @@ pub async fn main() -> Result<()> {
 
     let written = settings::apply(
         &home,
-        &settings::Settings {
+        &settings::AgentSettings {
             harness,
             model: &model,
             timeout,
-            bifrost: bifrost.as_deref(),
+            bifrost_url: bifrost.as_deref(),
         },
     )
     .context("cannot write harness settings")?;
@@ -369,8 +369,13 @@ pub async fn main() -> Result<()> {
     }
     std::fs::create_dir_all(home.join("work")).context("cannot create ~/work")?;
 
+    // pi may know the model under another name: see `settings::PiModel`.
+    let run_model = match harness {
+        Harness::Pi => settings::PiModel::of(&model).cli(),
+        _ => model.clone(),
+    };
     let runtime = Arc::new(Runtime::new(
-        harness, &model, timeout, &token, &hub_url, &home,
+        harness, &run_model, timeout, &token, &hub_url, &home,
     ));
     let listener = tokio::net::TcpListener::bind("0.0.0.0:7001")
         .await

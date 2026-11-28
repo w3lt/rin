@@ -68,12 +68,16 @@ Checks the config and the instructions, then writes the team's directory to
 
 It refuses, and writes nothing, when:
 
-- the config breaks the [schema](/reference/config/), or has a duplicate agent id;
+- the config breaks the [schema](/reference/config/), or has a duplicate agent or
+  [`llmProviders`](/reference/config/#llmproviders) id;
+- a pi agent's `model` is not `<provider>/<model>` with a known provider, or an agent of
+  another harness uses `ollama` or a custom provider;
 - its `version` is not this `rin`'s version;
 - an agent has no `INSTRUCTIONS.md`, or a directory in `<DIR>` is no agent;
 - the team's Docker names would clash with another generated team's.
 
-It warns when the team has API-key agents and `keys.env` is missing or has no known key.
+It warns when `keys.env` is missing a key the team's API-key agents need, naming the
+variables (see [When a key is missing](/guides/authentication/#when-a-key-is-missing)).
 
 Running it again with nothing changed changes nothing. Tokens and Bifrost virtual keys are
 kept; delete `tokens.json` first to [rotate tokens](/guides/lifecycle/#rotate-tokens).
@@ -106,7 +110,8 @@ an `INSTRUCTIONS.md` restarts nothing.
 It refuses when port `10302` on `127.0.0.1` is taken, naming the other Rin team that is up
 if there is one. If starting fails and nothing was running before, it stops what it started.
 
-After starting, it warns when the team has API-key agents and `keys.env` is missing.
+It also refuses, before starting anything, when `keys.env` is missing a key the team's
+API-key agents need (or doesn't exist and one is needed), naming the variables.
 
 ## rin down
 

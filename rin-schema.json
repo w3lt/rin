@@ -4,12 +4,7 @@
   "description": "Declarative configuration for a cluster of Rin swarm agent. Rin Tohsaka is the best waifu btw",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "rin",
-    "name",
-    "agents",
-    "version"
-  ],
+  "required": ["rin", "name", "agents", "version"],
   "properties": {
     "rin": {
       "type": "string",
@@ -49,9 +44,7 @@
       },
       "contains": {
         "type": "object",
-        "required": [
-          "type"
-        ],
+        "required": ["type"],
         "properties": {
           "type": {
             "const": "leader"
@@ -60,6 +53,13 @@
       },
       "minContains": 1,
       "maxContains": 1
+    },
+    "llmProviders": {
+      "type": "array",
+      "description": "Extra LLM providers , besides the built-in openai, anthropic, google and ollama (Ollama Cloud). A harness can use one with model: <id>/<model>.",
+      "items": {
+        "$ref": "#/$defs/llmProvider"
+      }
     }
   },
   "$defs": {
@@ -77,22 +77,13 @@
       ],
       "properties": {
         "id": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9-]{0,30}$",
+          "$ref": "#/$defs/id",
           "not": {
-            "enum": [
-              "user",
-              "hub",
-              "bifrost",
-              "localhost"
-            ]
+            "enum": ["user", "hub", "bifrost", "localhost"]
           }
         },
         "type": {
-          "enum": [
-            "leader",
-            "member"
-          ]
+          "enum": ["leader", "member"]
         },
         "label": {
           "type": "string",
@@ -102,18 +93,10 @@
           "$ref": "#/$defs/resources"
         },
         "harness": {
-          "enum": [
-            "claude-code",
-            "codex",
-            "antigravity",
-            "pi"
-          ]
+          "enum": ["claude-code", "codex", "antigravity", "pi"]
         },
         "authentication": {
-          "enum": [
-            "subscription",
-            "apiKey"
-          ]
+          "enum": ["subscription", "apiKey"]
         },
         "model": {
           "type": "string"
@@ -130,9 +113,7 @@
             "const": "pi"
           }
         },
-        "required": [
-          "harness"
-        ]
+        "required": ["harness"]
       },
       "then": {
         "properties": {
@@ -140,18 +121,64 @@
             "const": "apiKey"
           }
         },
-        "required": [
-          "authentication"
-        ]
+        "required": ["authentication"]
+      }
+    },
+    "llmProvider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "baseUrl", "apiKeyRequired"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "Identifier of the provider; a model will be under the form: <id>/<model>. openai, anthropic, google and ollama are built in.",
+          "not": {
+            "enum": ["openai", "anthropic", "google", "ollama"]
+          }
+        },
+        "type": {
+          "description": "The API the provider speaks. openai: OpenAI chat completions.",
+          "enum": ["openai"]
+        },
+        "baseUrl": {
+          "type": "string",
+          "description": "The base url of the provider. Use your eyes to read the provider's documentation please",
+          "pattern": "^https?://[^\\s/?#]+(/[^\\s?#]*)?$"
+        },
+        "apiKeyRequired": {
+          "type": "boolean",
+          "description": "Whether the provider needs an API key: usually true for cloud providers, false for local ones."
+        },
+        "apiKeyEnv": {
+          "type": "string",
+          "description": "The variable in keys.env that holds the provider's API key. Required when apiKeyRequired is true, not allowed otherwise.",
+          "pattern": "^[A-Z_][A-Z0-9_]*$",
+          "not": {
+            "pattern": "^(BIFROST|RIN)_"
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "apiKeyRequired": {
+            "const": true
+          }
+        },
+        "required": ["apiKeyRequired"]
+      },
+      "then": {
+        "required": ["apiKeyEnv"]
+      },
+      "else": {
+        "not": {
+          "required": ["apiKeyEnv"]
+        }
       }
     },
     "resources": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "cpus",
-        "ram"
-      ],
+      "required": ["cpus", "ram"],
       "properties": {
         "cpus": {
           "type": "number",
@@ -164,6 +191,10 @@
           "description": "Memory limit for the agent's container (Compose mem_limit), e.g. 512m or 4g"
         }
       }
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,30}$"
     }
   }
 }

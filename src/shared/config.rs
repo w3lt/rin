@@ -35,6 +35,56 @@ pub struct Config {
     #[serde(default)]
     pub messaging: Messaging,
     pub agents: Vec<Agent>,
+    /// Left out of `rin.json` when empty, so teams without one generate as before.
+    #[serde(
+        default,
+        rename = "llmProviders",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub llm_providers: Vec<LlmProvider>,
+}
+
+/// The providers every team has, without `llmProviders`. `ollama` is Ollama Cloud.
+pub const BUILT_IN_PROVIDERS: [&str; 4] = ["anthropic", "openai", "google", "ollama"];
+
+/// A custom provider from `llmProviders`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct LlmProvider {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub api_type: ApiType,
+    pub base_url: String,
+    pub api_key_required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api_key_env: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ApiType {
+    /// OpenAI chat completions.
+    Openai,
+}
+
+impl LlmProvider {
+    /// Its name in Bifrost and pi: prefixed, so no id can clash with one of
+    /// their own providers (`groq`, `openrouter`, …).
+    pub fn gateway_name(&self) -> String {
+        custom_provider_name(&self.id)
+    }
+}
+
+/// See [`LlmProvider::gateway_name`].
+pub fn custom_provider_name(id: &str) -> String {
+    format!("rin-{id}")
+}
+
+/// `anthropic/claude-sonnet-5-5` → `("anthropic", "claude-sonnet-5-5")`.
+pub fn split_model(model: &str) -> Option<(&str, &str)> {
+    model
+        .split_once('/')
+        .filter(|(provider, model)| !provider.is_empty() && !model.is_empty())
 }
 
 impl Serialize for Tohsaka {
@@ -222,6 +272,22 @@ To message a teammate, run `rin send <id> \"<text>\"` in the shell: it waits and
     }
 }
 
+impl Agent {
+    /// The provider an API-key agent's requests go to: built in or from
+    /// `llmProviders`. `None` for subscription agents.
+    pub fn provider(&self) -> Option<&str> {
+        if self.authentication != Authentication::ApiKey {
+            return None;
+        }
+        match self.harness {
+            Harness::ClaudeCode => Some("anthropic"),
+            Harness::Codex => Some("openai"),
+            Harness::Antigravity => Some("google"),
+            Harness::Pi => split_model(&self.model).map(|(provider, _)| provider),
+        }
+    }
+}
+
 impl AgentType {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -304,6 +370,7 @@ impl Config {
                 version: VERSION.to_string(),
                 messaging: Messaging::default(),
                 agents: vec![leader, backend, frontend, devops],
+                llm_providers: Vec::new(),
             },
             vec![
                 leader_instructions,
@@ -324,6 +391,10 @@ impl Config {
             .any(|a| a.authentication == Authentication::ApiKey)
     }
 
+    pub fn custom_provider(&self, id: &str) -> Option<&LlmProvider> {
+        self.llm_providers.iter().find(|p| p.id == id)
+    }
+
     /// Checks JSON Schema can't express.
     fn check(&self) -> anyhow::Result<()> {
         if parse_minutes(&self.messaging.timeout).is_none() {
@@ -336,6 +407,40 @@ impl Config {
         for agent in &self.agents {
             if !seen.insert(agent.id.as_str()) {
                 rin_bail!("duplicate agent id: {:?}", agent.id);
+            }
+        }
+        let mut seen = std::collections::HashSet::new();
+        for provider in &self.llm_providers {
+            if !seen.insert(provider.id.as_str()) {
+                rin_bail!("duplicate llmProviders id: {:?}", provider.id);
+            }
+        }
+        let known = |p: &str| BUILT_IN_PROVIDERS.contains(&p) || self.custom_provider(p).is_some();
+        for agent in &self.agents {
+            let prefix = split_model(&agent.model).map(|(provider, _)| provider);
+            if agent.harness == Harness::Pi {
+                if !prefix.is_some_and(known) {
+                    let custom: Vec<_> = self.llm_providers.iter().map(|p| p.id.as_str()).collect();
+                    let all = BUILT_IN_PROVIDERS
+                        .iter()
+                        .copied()
+                        .chain(custom)
+                        .collect::<Vec<_>>();
+                    rin_bail!(
+                        "agent {:?}: pi model {:?} must be <provider>/<model>, with <provider> one of {}",
+                        agent.id,
+                        agent.model,
+                        all.join(", ")
+                    );
+                }
+            } else if let Some(p) =
+                prefix.filter(|p| *p == "ollama" || self.custom_provider(p).is_some())
+            {
+                rin_bail!(
+                    "agent {:?}: only pi agents can use provider {p:?}; {} talks to its own provider",
+                    agent.id,
+                    agent.harness.as_str()
+                );
             }
         }
         Ok(())
@@ -554,6 +659,110 @@ mod tests {
             .contains("foo")
         );
         assert!(err(&edit("ram: 2g\n", "ram: 2g\n      gpu: 1\n")).contains("gpu"));
+    }
+
+    const PROVIDERS: &str = "
+llmProviders:
+  - id: groq
+    type: openai
+    baseUrl: https://api.groq.com/openai/v1
+    apiKeyRequired: true
+    apiKeyEnv: GROQ_API_KEY
+  - id: local
+    type: openai
+    baseUrl: http://host.docker.internal:8000/v1
+    apiKeyRequired: false
+";
+
+    /// The example team with custom providers and devops on `model`.
+    fn with_providers(model: &str) -> String {
+        edit(
+            "model: anthropic/claude-sonnet-5-5",
+            &format!("model: {model}"),
+        ) + PROVIDERS
+    }
+
+    #[test]
+    fn parses_custom_providers() {
+        let config = from_yaml(&with_providers("groq/llama-4")).unwrap();
+        assert_eq!(config.llm_providers.len(), 2);
+        let groq = config.custom_provider("groq").unwrap();
+        assert_eq!(groq.api_key_env.as_deref(), Some("GROQ_API_KEY"));
+        assert_eq!(groq.gateway_name(), "rin-groq");
+        assert_eq!(config.agents[3].provider(), Some("groq"));
+        assert_eq!(config.agents[1].provider(), None, "subscription");
+        let back = from_value(serde_json::to_value(&config).unwrap()).unwrap();
+        assert_eq!(config, back);
+        // Teams without custom providers write rin.json as before.
+        let plain = serde_json::to_value(from_yaml(EXAMPLE).unwrap()).unwrap();
+        assert!(plain.get("llmProviders").is_none(), "{plain}");
+    }
+
+    #[test]
+    fn pi_models_name_a_known_provider() {
+        for model in ["local/qwen3", "ollama/gpt-oss:120b", "google/gemini-3-pro"] {
+            from_yaml(&with_providers(model)).unwrap_or_else(|e| panic!("{model}: {e:#}"));
+        }
+        for model in ["claude-sonnet-5-5", "nope/x", "groq/", "/x"] {
+            let e = err(&with_providers(model));
+            assert!(e.contains("must be <provider>/<model>"), "{model}: {e}");
+            assert!(e.contains("ollama, groq, local"), "{model}: {e}");
+        }
+    }
+
+    #[test]
+    fn only_pi_uses_ollama_and_custom_providers() {
+        for model in ["ollama/qwen3", "groq/llama-4"] {
+            let yaml = edit("model: gpt-6-luna", &format!("model: {model}")) + PROVIDERS;
+            let e = err(&yaml);
+            assert!(
+                e.contains("only pi agents can use provider"),
+                "{model}: {e}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_bad_custom_providers() {
+        let yaml = with_providers("groq/llama-4");
+        for (from, to, path) in [
+            ("id: groq", "id: ollama", "/llmProviders/0/id"),
+            ("id: groq", "id: Groq", "/llmProviders/0/id"),
+            ("type: openai", "type: anthropic", "/llmProviders/0/type"),
+            (
+                "baseUrl: https://api.groq.com/openai/v1",
+                "baseUrl: api.groq.com",
+                "/llmProviders/0/baseUrl",
+            ),
+            ("    apiKeyEnv: GROQ_API_KEY\n", "", "/llmProviders/0"),
+            (
+                "apiKeyEnv: GROQ_API_KEY",
+                "apiKeyEnv: groq-key",
+                "/llmProviders/0/apiKeyEnv",
+            ),
+            (
+                "apiKeyEnv: GROQ_API_KEY",
+                "apiKeyEnv: BIFROST_ADMIN_PASSWORD",
+                "/llmProviders/0/apiKeyEnv",
+            ),
+            (
+                "apiKeyRequired: false",
+                "apiKeyRequired: false\n    apiKeyEnv: X",
+                "/llmProviders/1",
+            ),
+            ("    apiKeyRequired: false\n", "", "/llmProviders/1"),
+            (
+                "apiKeyRequired: false",
+                "apiKeyRequired: false\n    models: [a]",
+                "/llmProviders/1",
+            ),
+        ] {
+            assert!(yaml.contains(from), "no {from:?}");
+            let e = err(&yaml.replacen(from, to, 1));
+            assert!(e.contains(path), "{to}: {e}");
+        }
+        let e = err(&yaml.replacen("id: local", "id: groq", 1));
+        assert!(e.contains("duplicate llmProviders id: \"groq\""), "{e}");
     }
 
     #[test]

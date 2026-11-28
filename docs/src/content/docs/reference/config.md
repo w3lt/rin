@@ -40,6 +40,7 @@ agents:
 | [`version`](#version) | string | yes | |
 | [`messaging`](#messaging) | object | no | see below |
 | [`agents`](#agents) | list | yes | |
+| [`llmProviders`](#llmproviders) | list | no | none |
 
 ### `rin`
 
@@ -117,8 +118,9 @@ The coding-agent tool the agent runs. See [Harnesses](/reference/harnesses/).
 ### `model`
 
 The model the harness uses, passed to it as written: use the name that harness expects.
-With `harness: pi` and `apiKey`, prefix the provider: `anthropic/<model>`,
-`openai/<model>` or `google/<model>`.
+With `harness: pi`, prefix the provider: `anthropic/<model>`, `openai/<model>`,
+`google/<model>`, `ollama/<model>` (Ollama Cloud) or `<id>/<model>` for one of your
+[`llmProviders`](#llmproviders). Other harnesses can't use `ollama` or custom providers.
 
 ### `maxSessions`
 
@@ -133,6 +135,46 @@ The container's limits. Both fields are required.
 | :---- | :--- | :------ | :--- |
 | `cpus` | number | `1`, `0.5`, `2` | Greater than 0. CPU cores (Compose `cpus`). |
 | `ram` | string | `512m`, `4g` | A whole number from 1, then `m` or `g`, lowercase (Compose `mem_limit`). |
+
+## `llmProviders`
+
+Extra providers for pi agents, besides the built-in `anthropic`, `openai`, `google` and
+`ollama` (Ollama Cloud). Each one speaks the OpenAI chat completions API. A pi agent uses
+one with `model: <id>/<model>`; the agent reaches it through Bifrost, like every API-key
+agent, so the provider's key stays out of its container.
+
+```yaml
+llmProviders:
+  - id: groq
+    type: openai
+    baseUrl: https://api.groq.com/openai/v1
+    apiKeyRequired: true
+    apiKeyEnv: GROQ_API_KEY
+  - id: local
+    type: openai
+    baseUrl: http://host.docker.internal:8000/v1
+    apiKeyRequired: false
+
+agents:
+  - id: devops
+    harness: pi
+    authentication: apiKey
+    model: groq/openai/gpt-oss-120b
+    # ...
+```
+
+| Field | Type | Required | Rule |
+| :---- | :--- | :------- | :--- |
+| `id` | string | yes | Unique. Same pattern as an agent's [`id`](#id); not `anthropic`, `openai`, `google` or `ollama`. |
+| `type` | `openai` | yes | The API the provider speaks: OpenAI chat completions. |
+| `baseUrl` | string | yes | `http://` or `https://`: the base URL an OpenAI client takes, usually ending in `/v1`. Requests go to `<baseUrl>/chat/completions`. |
+| `apiKeyRequired` | boolean | yes | Whether the provider needs a key: usually `true` for cloud providers, `false` for local ones. |
+| `apiKeyEnv` | string | if `apiKeyRequired` | The variable in [`keys.env`](/guides/authentication/#api-key) holding the key, such as `GROQ_API_KEY`. Not allowed when `apiKeyRequired` is `false`; can't start with `BIFROST_` or `RIN_`. |
+
+`baseUrl` is reached from Bifrost's container, so `localhost` is Bifrost itself: for a
+server on your machine, such as a local Ollama, vLLM or LM Studio, use
+`host.docker.internal` (Rin adds it on Linux too). Make the server listen on an address
+containers can reach, not only `127.0.0.1`.
 
 ## Editor support
 

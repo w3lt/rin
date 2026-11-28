@@ -106,6 +106,16 @@ fn running_teams(except: &Team) -> Vec<String> {
 }
 
 pub fn up(team: &Team) -> Result<()> {
+    // Before anything starts: an agent without its provider key only fails later, inside.
+    let keys_env = team::rin_home()?.join("keys.env");
+    if let Ok(config) = team.config()
+        && let Some(problem) = generate::missing_keys(&keys_env, &config)
+    {
+        rin_bail!(
+            "cannot start team {}: {problem}. Add the keys, then run `rin generate` and `rin up`",
+            team.name
+        );
+    }
     let states = states(team)?;
     let hub_up = states.get("hub").is_some_and(|s| s == "running");
     let any_up = states.values().any(|s| s == "running");
@@ -139,14 +149,6 @@ pub fn up(team: &Team) -> Result<()> {
             team.name,
             team::HUB_PORT,
             others_up(team)
-        );
-    }
-    // Last, so the build output doesn't scroll it away.
-    let keys_env = team::rin_home()?.join("keys.env");
-    if !keys_env.is_file() && team.config().is_ok_and(|c| c.uses_api_keys()) {
-        rinerrln!(
-            "warning: {} is missing: API-key agents will fail. Add your provider keys, then run `rin generate` and `rin up`",
-            keys_env.display()
         );
     }
     Ok(())
