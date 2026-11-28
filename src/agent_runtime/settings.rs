@@ -76,20 +76,20 @@ pub fn apply(home: &Path, settings: &AgentSettings) -> Result<Vec<PathBuf>> {
                     s.insert("defaultProvider".into(), json!(provider));
                 }
             })?;
-            if let Some(bifrost) = settings.bifrost_url {
+            if let Some(bifrost_url) = settings.bifrost_url {
                 let route = match provider {
-                    Some("anthropic") => Some(("anthropic", format!("{bifrost}/anthropic"))),
-                    Some("openai") => Some(("openai", format!("{bifrost}/openai/v1"))),
-                    Some("google") => Some(("google", format!("{bifrost}/genai"))),
+                    Some("anthropic") => Some(("anthropic", format!("{bifrost_url}/anthropic"))),
+                    Some("openai") => Some(("openai", format!("{bifrost_url}/openai/v1"))),
+                    Some("google") => Some(("google", format!("{bifrost_url}/genai"))),
                     _ => None,
                 };
                 match (extra_provider, route) {
                     (Some(name), _) => json(home.join(".pi/agent/models.json"), &|s| {
                         let entry = object(object(s, "providers"), name);
-                        entry.insert("baseUrl".into(), json!(format!("{bifrost}/openai/v1")));
+                        entry.insert("baseUrl".into(), json!(format!("{bifrost_url}/openai/v1")));
                         entry.insert("api".into(), json!("openai-completions"));
                         // The name of the variable holding the agent's virtual key.
-                        entry.insert("apiKey".into(), json!("OPENAI_API_KEY"));
+                        entry.insert("apiKey".into(), json!("$OPENAI_API_KEY"));
                         let models = array(entry, "models");
                         if !models.iter().any(|m| m.get("id") == Some(&json!(model_id))) {
                             models.push(json!({ "id": model_id }));
@@ -441,7 +441,7 @@ mod tests {
             let entry = &models["providers"][name];
             assert_eq!(entry["baseUrl"], "http://bifrost:8080/openai/v1");
             assert_eq!(entry["api"], "openai-completions");
-            assert_eq!(entry["apiKey"], "OPENAI_API_KEY");
+            assert_eq!(entry["apiKey"], "$OPENAI_API_KEY");
             assert_eq!(entry["models"], json!([{ "id": pi_model }]));
             assert_eq!(PiModel::of(model).cli(), format!("{name}/{pi_model}"));
 
