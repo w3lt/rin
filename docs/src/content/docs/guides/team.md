@@ -9,10 +9,10 @@ agent, which tells that agent who it is and what it owns.
 ## A minimal team
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/w3lt/rin/refs/tags/v0.2.0/rin-schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/w3lt/rin/refs/tags/v0.2.1/rin-schema.json
 rin: tohsaka
 name: duo
-version: 0.2.0
+version: 0.2.1
 
 agents:
   - id: lead

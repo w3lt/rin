@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=../../rin-schema.json
 rin: tohsaka
 name: my-team
-version: 0.2.0
+version: 0.2.1
 
 messaging:
   timeout: 30m

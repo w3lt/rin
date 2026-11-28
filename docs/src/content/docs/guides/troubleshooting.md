@@ -23,7 +23,7 @@ No team has been generated yet on this machine (or in this `RIN_HOME`).
 `--team` or `rin use` names a team that hasn't been generated. Teams are named by the
 `name` in their `rin.yml`, not by a directory.
 
-**`` version 0.1.2 does not match this rin (0.2.0); install rin 0.1.2 or change `version:` ``**\
+**`` version 0.1.2 does not match this rin (0.2.1); install rin 0.1.2 or change `version:` ``**\
 The file was written for another Rin version. Install that version, or
 [upgrade the team](/guides/lifecycle/#upgrade-rin).
 

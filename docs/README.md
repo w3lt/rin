@@ -32,9 +32,9 @@ hand in `astro.config.mjs`, so add a new page there too.
   exactly, so readers can search for them.
 - When a change to Rin changes a command, flag, field, default or message, update these pages
   in the same pull request.
-- **Examples pin the current version** (`version: 0.2.0` and the `refs/tags/v0.2.0` schema
+- **Examples pin the current version** (`version: 0.2.1` and the `refs/tags/v0.2.1` schema
   URL), because `rin generate` refuses any other. Update them on every release:
-  `grep -rn '0\.2\.0' src/content/docs`.
+  `grep -rn '0\.2\.1' src/content/docs`.
 - Plain words, short sentences, present tense. Address the reader as "you".
 
 ## Publishing

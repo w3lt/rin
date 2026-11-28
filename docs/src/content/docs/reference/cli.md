@@ -173,7 +173,7 @@ rin status
 Each agent's container state, with the hub's sessions and queues:
 
 ```
-team my-team (rin 0.2.0)
+team my-team (rin 0.2.1)
 ID        LABEL               TYPE    HARNESS      STATE    SESSIONS  QUEUED
 rinlead   Rin Lead            leader  claude-code  running  1/3       0
 backend   Backend Engineer    member  codex        running  0/3       0

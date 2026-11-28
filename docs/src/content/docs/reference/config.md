@@ -9,10 +9,10 @@ into the `rin` binary, so every `rin` of a version checks a config the same way.
 fields are errors.
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/w3lt/rin/refs/tags/v0.2.0/rin-schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/w3lt/rin/refs/tags/v0.2.1/rin-schema.json
 rin: tohsaka
 name: my-team
-version: 0.2.0
+version: 0.2.1
 
 messaging:
   timeout: 30m
@@ -181,7 +181,7 @@ containers can reach, not only `127.0.0.1`.
 Add the schema line as the first line of the file, with your version:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/w3lt/rin/refs/tags/v0.2.0/rin-schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/w3lt/rin/refs/tags/v0.2.1/rin-schema.json
 ```
 
 Editors with a YAML language server then complete fields and flag mistakes as you type.
