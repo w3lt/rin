@@ -4,7 +4,7 @@
 use crate::shared::config::{Agent, Authentication, Config, Harness};
 use crate::yaml::{Yaml, list, map, s};
 
-pub const BIFROST_IMAGE: &str = "maximhq/bifrost:v2.5.1";
+pub const BIFROST_IMAGE: &str = "maximhq/bifrost:v2.7.0";
 pub const BIFROST_URL: &str = "http://bifrost:8080";
 
 pub struct Inputs<'a> {
