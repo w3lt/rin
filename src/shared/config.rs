@@ -53,7 +53,7 @@ pub const BUILT_IN_PROVIDERS: [&str; 4] = ["anthropic", "openai", "google", "oll
 pub struct LlmProvider {
     pub id: String,
     #[serde(rename = "type")]
-    pub provider_type: ProviderType,
+    pub api_type: ApiType,
     pub base_url: String,
     pub api_key_required: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -62,7 +62,7 @@ pub struct LlmProvider {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum ProviderType {
+pub enum ApiType {
     /// OpenAI chat completions.
     Openai,
 }

@@ -16,7 +16,7 @@ use crate::team::{self, Team, Tokens, read_tokens};
 pub const DOCKERFILE: &str = include_str!("../../images/Dockerfile");
 
 /// Built-in providers: Rin's id, Bifrost's name, and the `keys.env` variable.
-const BUILT_IN: [(&str, &str, &str); 4] = [
+const BUILTIN_PROVIDER_METADATA: [(&str, &str, &str); 4] = [
     ("anthropic", "anthropic", "ANTHROPIC_API_KEY"),
     ("openai", "openai", "OPENAI_API_KEY"),
     ("google", "gemini", "GEMINI_API_KEY"),
@@ -263,7 +263,10 @@ fn defined_keys(keys_env: &Path) -> Vec<String> {
 
 /// The `keys.env` variable a provider's key is in; `None` for a keyless custom provider.
 fn key_var<'a>(config: &'a Config, provider: &str) -> Option<&'a str> {
-    match BUILT_IN.iter().find(|(id, _, _)| *id == provider) {
+    match BUILTIN_PROVIDER_METADATA
+        .iter()
+        .find(|(id, _, _)| *id == provider)
+    {
         Some((_, _, var)) => Some(var),
         None => config.custom_provider(provider)?.api_key_env.as_deref(),
     }
@@ -307,7 +310,10 @@ fn bifrost_providers(
 ) -> serde_json::Map<String, serde_json::Value> {
     let has = |var: &str| defined.iter().any(|d| d == var);
     let mut providers = serde_json::Map::new();
-    for (_, name, var) in BUILT_IN.iter().filter(|(_, _, var)| has(var)) {
+    for (_, name, var) in BUILTIN_PROVIDER_METADATA
+        .iter()
+        .filter(|(_, _, var)| has(var))
+    {
         let mut key =
             json!({ "name": name, "value": format!("env.{var}"), "models": ["*"], "weight": 1.0 });
         if *name == "ollama" {
