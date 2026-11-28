@@ -48,7 +48,7 @@ FROM base AS claude-code
 
 ARG CLAUDE_CODE_VERSION=2.1.326
 
-RUN npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+RUN npm install -g --ignore-scripts "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
     && npm cache clean --force
 
 ENV RIN_HARNESS=claude-code \
@@ -64,7 +64,7 @@ FROM base AS codex
 
 ARG CODEX_VERSION=0.172.0
 
-RUN npm install -g "@openai/codex@${CODEX_VERSION}" \
+RUN npm install -g --ignore-scripts "@openai/codex@${CODEX_VERSION}" \
     && npm cache clean --force
 
 ENV RIN_HARNESS=codex
