@@ -15,7 +15,6 @@ trap 'rm -f "$log"' EXIT
 
 source scripts/lib/step.sh
 
-# The pnpm docs/package.json pins: another one refuses to install.
 pnpm_pin="$(sed -n 's/.*"packageManager": *"pnpm@\([^"]*\)".*/\1/p' docs/package.json)"
 pnpm_is_pinned() {
     local v
